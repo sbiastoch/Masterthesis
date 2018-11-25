@@ -1,0 +1,46 @@
+
+\section{Constraints of our approach}
+Our approach can optimize a wide range of recursive UDFs, but there exist cases where a translation would not be beneficial or is not possible with my current implementation. I will characterize the set of translateable UDFs by formulating a number of constraints that must hold for a given query. Otherwise, the translation will fail or lead to an incorrect translation.
+ 
+\subsection{No dependant callsites}
+Our evaluation-strategy evaluates all callsites of an recursive expression independently and returns a result eventually only if all contained callsites have returned a result. For this reason, dependant callsites like $f(f(x))$ are not possible. Even more important is this constraint for \CASE-Statements. Imagine the following body of a recursive UDF \texttt{f}:
+% TODO: Find more meaningful example
+\begin{minted}{postgresql} 
+SELECT CASE
+  WHEN n      = 0 THEN 0
+  WHEN f(n-1) = 0 THEN 1
+  WHEN f(n-2) = 1 THEN 2
+  ELSE 0
+END;
+\end{minted}
+Here, the execution of the second \CASE-branch depends on the execution of the callsite in the first branch. After statically analysis, this block would result in one big recursive case with two callsites. The evaluation-strategy would execute both calls, leading to a behaviour possibly differing greatly from the original, eg. calling \texttt{f(n-2)} with invalid parameters leading to an infinite loop \texttt{(f(0), f(1)), (f(-1), f(-2), (f(-2), f(-3)), ...)}
+
+\subsection{Explicit basecases required}
+It is possible to write recursive functions that does not posses a basecase according to our static analysis, but do terminate and thus posses another way of terminating. Trivially, this can be achieved by using other conditionals as \CASE for case distinction like \texttt{GREATEST}, \texttt{LEAST}, \texttt{NULLIF} or \texttt{COALESCE}. Those functions can be viewed as syntactic sugar for \CASE since all of them can be formulated with \CASE only, see \ref{sql:cond_norm}. This could be done easilly in a normalizing preprocessing step.
+
+But there exist more ways of formulating basecases which are harder do detect, like in the following example:
+\sqlcode{snippets/no_basecases.sql}
+Here, the basecase occurs when the table containing the recursive call is empty and therefore no recursive call happens. Examples like this show, that there is a variety of possibilities to write recursive functions without using an explicit \CASE. Translations for many of them may exist, but we focus in the following on recursive queries with explicit case-distinctions utilizing \CASE-expressions.
+
+\subsection{Predicates and callsite-arguments may only reference CTEs and schema tables}
+We require that predicates within a \texttt{CASE}-statement contain no references to row-varaibles like \texttt{T.v} that were introduced by an outer \FROM. This does not mean that no tables can be accessed. It is indeed possible to access tables, but these have to origin from an CTE, not a \FROM. This assumption is necessary to savely factor out the predicate which gets evaluated repeatably in the original implementation. This constraint can also be lifted if a table-compatible template is used for translation. The idea of the table-template is to replace all row variables by our own variables, alongside with the callsite-results. That way we have 
+\sqlcode{snippets/predicates_must_be_selfcontained.sql}
+
+The same goes for arguments of callsites.
+
+\begin{listing}[ht]
+\sqlcode{snippets/predicate_with_outside_references.sql}
+\caption{Example of a (forbidden) predicate that has references to outside tables and thus returns a table of predicates.}
+\label{lst:from_nonselfcontained}
+\end{listing}
+
+\section{Problem specific optimization vs. automatic translation}
+Without doubt, any problem specific optimization can outperform our automatic generated solution. We cannot exploit domain specific properties that constrain the solution space. Lets take again for example the fibonacci-function. By its definition, it is completely sufficient to keep only the last two numbers 
+
+Nevertheless this does not render our solution less valuable: Problem specific optimizations may exists, but usually it is hard do uncover and exploit them. In practice, the effort to come up with an optimal solution is not worth all the effort when a "good enough" solution would also fit the use-case. Furthermore, the maintainability of a short and simple, declarative piece of code is much higher than the optimized version, that exploits subtle properties of the problem, the database-system or uses other nifty tweaks.
+
+Exmaple threaded binary tree for iterative tree traversal to keep stack size manageable => smart, but hard to find!
+
+[Example Plots for fib, sieve..?]
+
+\section{Related work}\label{related_work}

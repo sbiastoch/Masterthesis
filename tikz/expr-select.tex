@@ -1,0 +1,55 @@
+{\small
+\begin{tikzpicture}[x=5mm, y=5mm]
+\node      at ( 8, 9) {$\SELECT$};
+\node (e1) at (10, 9) {$\highlight[red!15]{e_1}$};
+\node      at (11, 9) {$,$};
+\node (e2) at (12, 9) {$\highlight[green!15]{e_2}$};
+\node      at (13, 9) {$,$};
+\node (e3) at (14, 9) {$\highlight[yellow!15]{e_3}$};
+\node      at (16, 9) {$\FROM ~ \dots$};
+
+\node (e11) at (6, 4) { 
+    \begin{tabular}{|p{1em}|r|c|}\hline
+    \cellcolor{gray!25}  & $\highlight[red!15]{\top}$ & $\highlight[red!15]{e_1}$\\\hline
+    \end{tabular}
+};
+
+\node (e21) at (12, 4.5) { 
+    \begin{tabular}{|p{1em}|r|c|}\hline
+    \cellcolor{gray!25}  & $\highlight[green!15]{p_{2,1}}$ & $\highlight[green!15]{r_{2,1}}$\\\hline
+    \end{tabular}
+};
+\node (e22) at (12, 3.5) { 
+    \begin{tabular}{|p{1em}|r|c|}\hline
+    \cellcolor{gray!25} $\ast$ & $\highlight[green!15]{p_{2,2}}$ & $\highlight[green!15]{r_{2,2}}$\\\hline
+    \end{tabular}
+};
+
+\node (e31) at (18, 4) { 
+    \begin{tabular}{|p{1em}|r|c|}\hline
+    \cellcolor{gray!25} & $\highlight[yellow!15]{\top}$ & $\highlight[yellow!15]{e_3}$\\\hline
+    \end{tabular}
+};
+
+\node (r1) at (30, 4.5) { 
+    \begin{tabular}{|p{1em}|r|c|}\hline
+    \cellcolor{gray!25}  & $\SELECT ~ \highlight[red!15]{\top} \land \highlight[green!15]{p_{2,1}} \land \highlight[yellow!15]{\top}$ & $\SELECT~ \highlight[red!15]{e_1}, \highlight[green!15]{r_{2,1}}, \highlight[yellow!15]{e_3} ~ \FROM \dots$\\\hline
+    \end{tabular}
+};
+\node (r2) at (30, 3.5) { 
+    \begin{tabular}{|p{1em}|r|c|}\hline
+    \cellcolor{gray!25} $\ast$ & $\SELECT ~ \highlight[red!15]{\top} \land \highlight[green!15]{p_{2,2}} \land \highlight[yellow!15]{\top}$ & $\SELECT~ \highlight[red!15]{e_1}, \highlight[green!15]{r_{2,2}}, \highlight[yellow!15]{e_3} ~ \FROM \dots$\\\hline
+    \end{tabular}
+};
+\draw[->, double, out=270, in=90, looseness = 0.5] (e1.south) to (e11);
+\draw[->, double, out=270, in=90, looseness = 0.5] (e2.south) to (e21);
+\draw[->, double, out=270, in=90, looseness = 0.5] (e3.south) to (e31);
+\draw (e11.5) to (e21.west);
+\draw (e11.355) to (e22.west);
+\draw (e21.east) to (e31.175);
+\draw (e22.east) to (e31.185);
+\draw[->] (e31.5) -- (r1.west);
+\draw[->] (e31.355) -- (r2.west);
+%\draw[->, bend left=20]  (e11.north) to (e21.north) to (e31.north) to (r1.west);
+%\draw[->, bend right=20] (e11.south) to (e22.south) to (e31.south) to (r2.west);
+\end{tikzpicture}}

@@ -1,0 +1,86 @@
+WITH T(v) AS (SELECT 1)                -- T = (1)
+SELECT (SELECT S.v + T.v FROM T AS S)  -- T = (4)
+FROM (
+	SELECT T.v+1 					   -- T = (3)
+	FROM (SELECT T.v+1 FROM T) AS T(v) -- T = (2)
+) AS T(v)
+
+
+Table-Variable vs. Row-References
+- CTEs creates new table-variables
+- FROMs use table-variables to create new row-references
+
+An expression is recursive if it contains a recursive call or references a recursive table-variable.
+
+Row-references are considered always nonrecursive, as they are eventually bound by a ~\FROM~ that links that reference to a table. If a query uses a recursive table-variable, those recursive calls are evaluated \textit{before} the \FROM-part. The row-references used in ~\SELECT~ and ~\WHERE~ are thus just reference to an intermediate result, that is not recursive anymore.
+
+Therefore we only need to keep track of table-variables
+
+WITH T AS ( -- recursive table reference T
+    SELECT f(1) -- recursive query
+)
+SELECT T.v -- nonrecursive row-variable
+FROM T(v)  -- recursive
+
+
+What row-variables point to a recursive origin? Row variables point to a table-variable that is always declared inside FROM. We allow four ways to define a table variable
+	- Referencing a db table
+	- Referencing a CTE
+	- Creating a subquery
+	- Calling table-generating function
+We consider an entry in the FROM-list recursive, if
+
+
+
+We distingush two cases:
+	- FROM contains a recursive subquery that needs to be evaluated before SELECT can be evaluated
+	- FROM acts only as a gateway to a recursive CTE, that needs to be evaluated before FROM and SELECT
+	- 
+
+
+
+Table-variables are only accessible via FROM. They do not leak into
+
+Namespace-hierachy of a query
+1. CTE
+2. FROM
+3. Subqueries in SELECT
+4. SELECTs see CTEs
+
+Table-Variable names must be different within the same WITH and FROM block.
+
+
+WITH T(v) AS (...)
+SELECT T.v FROM (...) AS T(v);
+
+
+WITH T(v) AS (...)
+SELECT T.v FROM (SELECT ... FROM T) AS T(v);
+
+WITH T(v) AS (...)
+SELECT
+	T.v,                          -- ref. to row variable
+	(SELECT ... FROM T)           -- ref. to CTE
+FROM (SELECT ... FROM T) AS T(v); -- ref. to CTE, introducing row variable to SELECT and WHERE
+
+
+
+
+
+
+WITH T(v) AS (SELECT 1)               -- T = (1)
+SELECT (SELECT S.v + T.v FROM T AS S) -- T = (4)
+FROM (
+	SELECT T.v+1 					              -- T = (3)
+	FROM (SELECT T.v+1 FROM T) AS T(v)  -- T = (2)
+) AS T(v)
+
+
+
+
+WITH T(v) AS (SELECT 1)
+SELECT T.v FROM (SELECT * FROM T) AS T(v) -- shorthand: FROM T
+
+WITH T AS (SELECT 1)
+SELECT T.v FROM T AS T(v)
+--         FROM (TABLE T) AS T(v)
