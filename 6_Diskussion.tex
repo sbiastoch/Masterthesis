@@ -23,6 +23,10 @@ But there exist more ways of formulating basecases which are harder do detect, l
 Here, the basecase occurs when the table containing the recursive call is empty and therefore no recursive call happens. Examples like this show, that there is a variety of possibilities to write recursive functions without using an explicit \CASE. Translations for many of them may exist, but we focus in the following on recursive queries with explicit case-distinctions utilizing \CASE-expressions.
 
 \subsection{Predicates and callsite-arguments may only reference CTEs and schema tables}
+One challange is sclicing the function, the other is evaluating the arguments idependently from the surrounding query. While the first is mostly solved by my thesis, the latter is worth further examination to lift the constraints on callsite-arguments.
+
+...
+
 We require that predicates within a \texttt{CASE}-statement contain no references to row-varaibles like \texttt{T.v} that were introduced by an outer \FROM. This does not mean that no tables can be accessed. It is indeed possible to access tables, but these have to origin from an CTE, not a \FROM. This assumption is necessary to savely factor out the predicate which gets evaluated repeatably in the original implementation. This constraint can also be lifted if a table-compatible template is used for translation. The idea of the table-template is to replace all row variables by our own variables, alongside with the callsite-results. That way we have 
 \sqlcode{snippets/predicates_must_be_selfcontained.sql}
 

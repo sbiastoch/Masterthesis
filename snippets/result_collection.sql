@@ -1,0 +1,12 @@
+WITH RECURSIVE
+  ...
+  loop AS (
+    SELECT NULL
+      UNION ALL
+    TABLE loop
+   )
+SELECT
+  COALESCE(
+    (SELECT e.res FROM evaluation e WHERE e.in_1 IS NOT DISTINCT FROM $1),
+    (SELECT DISTINCT NULL::NUMERIC FROM loop)
+  )

@@ -1,22 +1,31 @@
-\chapter{Theoretical background}\label{Introduction}
+\chapter{Background}\label{Introduction}
 \section{SQL}\label{theory}
-Declarativity\\
-Indices\\
-Query Planner\\
-Turing completeness of SQL:1999?
+Turing completeness of SQL:1999
+\subsection{Declarativity and the Query Planner}
 
-\subsection{Evaluation of SQL-Queries}
-\subsubsection{Evaluation of \texttt{WITH RECURSIVE}}
+\subsection{User Defined Functions}
+Possible Languages, (Im)possible optimizations
+
+\subsection{Evaluation of \texttt{WITH RECURSIVE}}
+$$
+q_0 ~\cup ~\underbrace{q_r(q_0)}_{q_1} ~\cup~ \underbrace{q_r(q_1)}_{q_2}~ \cup~\underbrace{q_r(q_2)}_{q_3}~ \cup ~\hdots ~ \cup ~ \underbrace{q_r(q_n)}_{= \emptyset}
+$$
+
 Recursive evaluation is composed of an nonrecursive basecase and an recursive case that references the results of the previous iteration.
 Stop when no new results are produced
 https://www.postgresql.org/docs/10/static/queries-with.html
 
-\subsection{User Defined Functions}
-Possible Languages, (Im)possible optimizations, ...?
-
 \section{Recursion}
-\subsection{Advantages}
-\subsection{Caveats}
-\subsection{Special types of recursion}
-\subsubsection{Tail recursion}
-\subsubsection{Single recursion}
+\subsection{Types of recursive functions}
+\subsection{Iterative solving of recursive functions}
+\subsection{Dynamic Programming}
+\subsection{Memoization}
+
+\begin{figure}
+    \centering
+    \include{tikz/fib_callstack_memoization.tex}
+    \caption{Callgraph with memoization, The callstack-tree becomes a Directed Acyclic Graph (DAG). Each node represents an invocation and each outgoing edge a new callsite. Because of memoization, evaluation of equal invocations is performed only once, ie. they have the same descendants.}
+    \label{fig:fib_callstack_memoization}
+\end{figure}
+
+\section{Operational Semantics}\label{SOS}

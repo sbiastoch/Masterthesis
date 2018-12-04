@@ -15,6 +15,9 @@
 \usepackage[margin=10pt,font=small,labelfont=bf]{caption}
 
 
+
+\usepackage[section]{placeins}
+\usepackage{multirow}
 \usepackage[table]{xcolor}
 \usepackage{bussproofs}
 \usepackage{tabu}
@@ -27,7 +30,7 @@
 \usepackage{mathtools}
 \usepackage{amssymb}
 \usepackage{tikz}
-\usetikzlibrary{positioning, calc, arrows}
+\usetikzlibrary{positioning, calc, arrows, tikzmark}
 \usetikzlibrary{shapes.multipart}
 \usepackage{xcolor}
 \definecolor{red}{HTML}{8c0000}
@@ -56,7 +59,7 @@
 \usemintedstyle{borland}
 \newmintedfile[sqlcode]{postgresql}{
     fontfamily=tt,
-    fontsize=\small,
+    fontsize=\footnotesize,
     %linenos=true,
     %numberblanklines=true,
     %numbersep=5pt,
@@ -74,6 +77,29 @@
     texcl=false,
 }
 \setminted[postgresql]{fontsize=\footnotesize}
+
+\newcommand*\circled[1]{\tikz[baseline=(char.base)]{
+            \node[shape=circle,draw,inner sep=1pt] (char) {\tiny{\textbf{#1}}};}}
+            
+            
+\newcommand{\markForTikz}[2]{\tikz[overlay,remember picture,baseline] 
+\node [anchor=base] (#1) {$#2$};}
+
+\newcommand{\DrawVLine}[3][]{%
+  \begin{tikzpicture}[overlay,remember picture]
+    \draw[shorten <=0.3ex, #1] (#2.north) -- (#3.south);
+  \end{tikzpicture}
+}
+
+\newcommand{\DrawHLine}[3][]{%
+  \begin{tikzpicture}[overlay,remember picture]
+    \draw[shorten <=0.2em, #1] (#2.west) -- (#3.east);
+  \end{tikzpicture}
+}
+
+% Do not make minted full width but only so wide as required
+\RecustomVerbatimEnvironment{Verbatim}{BVerbatim}{}
+\renewcommand{\figurename}{Listing}
 
 \DeclareMathOperator{\FV}{\text{\rm FV}} % set of free variables
 \DeclareMathOperator{\refs}{\ensuremath{\text{refs}}}
@@ -94,10 +120,11 @@
 \newcommand{\TRUE}{\ensuremath{\text{\texttt{TRUE}}}}
 
 \newcommand{\RREC}{\ensuremath{\text{\textsc{REC}}}}
+\newcommand{\RREF}{\ensuremath{\text{\textsc{BASE}}}}
 \newcommand{\RBASE}{\ensuremath{\text{\textsc{BASE}}}}
 \newcommand{\REXPR}{\ensuremath{\text{\textsc{EXPR}}}}
 \newcommand{\RWHEN}{\ensuremath{\text{\textsc{WHEN}}}}
-\newcommand{\RWHENREC}{\ensuremath{\text{\textsc{WHENREC}}}}
+\newcommand{\RELSE}{\ensuremath{\text{\textsc{ELSE}}}}
 \newcommand{\RCTE}{\ensuremath{\text{\textsc{CTE}}}}
 \newcommand{\RWITH}{\ensuremath{\text{\textsc{WITH}}}}
 \newcommand{\RSELECT}{\ensuremath{\text{\textsc{SELECT}}}}
@@ -113,8 +140,6 @@
 %\oddsidemargin 1cm
 %\footskip 2cm
 %\parskip0.5explus0.1exminus0.1ex
-
-
 
 \providecommand*{\listingautorefname}{Listing}
 

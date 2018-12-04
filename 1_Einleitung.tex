@@ -55,14 +55,17 @@ My thesis digs deep on the latter and just flys over the templates, since the te
         \begin{tikzpicture}
         % nodes
         \node (n1)     at (2.5, 2) {fib(4)};
-        \node (n1-1)   at (1, 1) {fib(3)};
-        \node (n1-1-1) at (0, 0) {fib(2)};
-        \node (n1-1-1-1) at (-0.5, -1) {fib(1)};
-        \node (n1-1-1-2) at (0.5, -1) {fib(0)};
-        \node (n1-1-2) at (2, 0) {fib(1)};
-        \node (n1-2)   at (4, 1) {fib(2)};
-        \node (n1-2-1) at (3, 0) {fib(1)};
-        \node (n1-2-2) at (5, 0) {fib(0)};
+            \node (n1-1)   at (1, 1) {fib(3)};
+                \node (n1-1-1) at (0, 0) {fib(2)};
+                    \node (n1-1-1-1) at (-0.5, -1) {fib(1)};
+                        \node (n1-1-1-1-0) at (-0.5, -2) {fib(0)};
+                    \node (n1-1-1-2) at (0.5, -1) {fib(0)};
+                \node (n1-1-2) at (2, 0) {fib(1)};
+                    \node (n1-1-2-0) at (2, -1) {fib(0)};
+            \node (n1-2)   at (4, 1) {fib(2)};
+                \node (n1-2-1) at (3, 0) {fib(1)};
+                    \node (n1-2-1-0) at (3, -1) {fib(0)};
+                \node (n1-2-2) at (5, 0) {fib(0)};
         % arrows
         \draw[->] (n1)     -- (n1-1);
         \draw[->] (n1)     -- (n1-2);
@@ -72,6 +75,9 @@ My thesis digs deep on the latter and just flys over the templates, since the te
         \draw[->] (n1-2)   -- (n1-2-2);
         \draw[->] (n1-1-1) -- (n1-1-1-1);
         \draw[->] (n1-1-1) -- (n1-1-1-2);
+        \draw[->] (n1-1-1-1) -- (n1-1-1-1-0);
+        \draw[->] (n1-1-2) -- (n1-1-2-0);
+        \draw[->] (n1-2-1) -- (n1-2-1-0);
         \end{tikzpicture}
         \caption{Growth of the callstack of \texttt{fib(4)}}
         \label{fib_4_callstack}
@@ -185,16 +191,16 @@ Translation begins with a static analysis that compiles the \CASE-expression int
                 \begin{tabular}{|l|}\hline
                     \footnotesize{Scenario 1}\\
                     \begin{tabular}{|l|}\hline
-                        \footnotesize{Callsite 1}\\
+                        \footnotesize{Args of callsite 1}\\
                     \hline \end{tabular}\\
                     \begin{tabular}{|l|}\hline
-                        \footnotesize{Callsite 2}\\
+                        \footnotesize{Args of callsite 2}\\
                     \hline \end{tabular}\\[2mm]
                 \hline \end{tabular}\\
                 \begin{tabular}{|l|}\hline
                     \footnotesize{Scenario 2}\\
                     \begin{tabular}{|l|}\hline
-                        \footnotesize{Callsite 3}\\
+                        \footnotesize{Args of callsite 3}\\
                     \hline \end{tabular}\\[2mm]
                 \hline \end{tabular}
                 \\[6mm]
@@ -212,16 +218,16 @@ Translation begins with a static analysis that compiles the \CASE-expression int
                 \begin{tabular}{|l|}\hline
                     \footnotesize{Scenario 1}\\
                     \begin{tabular}{|l|}\hline
-                        \footnotesize{Callsite 1}\\
+                        \footnotesize{Args of callsite 1}\\
                     \hline \end{tabular}\\
                     \begin{tabular}{|l|}\hline
-                        \footnotesize{Callsite 2}\\
+                        \footnotesize{Args of callsite 2}\\
                     \hline \end{tabular}\\[2mm]
                 \hline \end{tabular}\\
                 \begin{tabular}{|l|}\hline
                     \footnotesize{Scenario 2}\\
                     \begin{tabular}{|l|}\hline
-                        \footnotesize{Callsite 3}\\
+                        \footnotesize{Args of callsite 3}\\
                     \hline \end{tabular}\\[2mm]
                 \hline \end{tabular}
                 \\[6mm]
@@ -271,45 +277,6 @@ Translation begins with a static analysis that compiles the \CASE-expression int
   };
 \draw[->, bend left=10, out=225, in=225, looseness=0.5] (fib2) edge (fib1);
 \draw[->, bend right=5, out=305, in=225, looseness=0.5] (fib2) edge (fib0);
-\end{tikzpicture}
-
-\begin{tikzpicture}
-% nodes
-\node (n1)     at (2.5, 2) {fib(4)};
-\node (n1-1)   at (1, 1) {fib(3)};
-\node (n1-1-1) at (0, 0) {fib(2)};
-\node (n1-1-1-1) at (-0.5, -1) {fib(1)};
-\node (n1-1-1-2) at (0.5, -1) {fib(0)};
-\node (n1-1-2) at (2, 0) {fib(1)};
-\node (n1-2)   at (4, 1) {fib(2)};
-\node (n1-2-1) at (3, 0) {fib(1)};
-\node (n1-2-2) at (5, 0) {fib(0)};
-% arrows
-\draw[<-] (n1)     -- (n1-1);
-\draw[<-] (n1)     -- (n1-2);
-\draw[<-] (n1-1)   -- (n1-1-1);
-\draw[<-] (n1-1)   -- (n1-1-2);
-\draw[<-] (n1-2)   -- (n1-2-1);
-\draw[<-] (n1-2)   -- (n1-2-2);
-\draw[<-] (n1-1-1) -- (n1-1-1-1);
-\draw[<-] (n1-1-1) -- (n1-1-1-2);
-\end{tikzpicture}
-
-\begin{tikzpicture}[node distance=2cm]
-% nodes
-\node (f4) at (2, 2) {fib(\textcolor{red}{4})};
-\node (f3) at (1, 1) {fib(\textcolor{green}{3})};
-\node (f2) at (3, 1) {fib(\textcolor{blue}{2})};
-\node (f1) at (2, 0) {fib(1)};
-\node (f0) at (4, 0) {fib(0)};
-% arrows
-\draw[->] (f4) -- (f3) node[pos=0.3,left]{\footnotesize{1}};
-\draw[->] (f4) -- (f2) node[pos=0.3,right]{\footnotesize{2}};
-\draw[->, out=240, in=270, looseness=2] (f3) edge (f2);
-\node (lbl) at (0.5, 0.6) {\footnotesize{1}};
-\draw[->] (f3) -- (f1) node[pos=0.6,left]{\footnotesize{2}};
-\draw[->] (f2) -- (f1) node[pos=0.3,left]{\footnotesize{1}};
-\draw[->]  (f2) -- (f0) node[pos=0.3,right]{\footnotesize{2}};
 \end{tikzpicture}
 
 \begin{tabular}{c|c|c}

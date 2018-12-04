@@ -8,6 +8,14 @@
 %%%%%%%%%%%%%%%%%%%%%%%%
 \chapter[Appendix]{Appendix}
 \phantomsection
-\section{Sample outputs}
+\section{Example translations}
+\subsection{\texttt{fib}}
+\begin{figure}\footnotesize
+    \centering
+    \sqlcode{snippets/fib_callstack.sql}
+    \caption{\texttt{callstack}-CTE as standalone query. Note that the UDF argument \texttt{\$1} is replaced with a SQL-variable \texttt{:n}}
+    \label{fib:callstack_cte_complete}
+\end{figure}
+\section{Conditional normalization}
 \sqlcode{snippets/conditional_normalization.sql}\label{sql:cond_norm}
 %%%%%%%%%%%%%%%%%%%%%%%%
