@@ -35,7 +35,7 @@ So there is a good point to do as much computations as possible right in the dat
 
 
 The Fibonacci function will serve us as guinea pig in this introductiary example and throughout the thesis.
-It is defined as $F_n = F_{n-1} + F_{n-2}$ with $F_0 = 0$ and $F_1 = 1$. There are various ways of defining this
+It is defined as $F_n = F_{n-1} + F_{n-2}$ with $F_0 = 0$ and $F_1 = 1$ \cite[p. 79]{TAOCP_Knuth}. There are various ways of defining this
 function as SQL UDF, but in this example we will use the (slightly awkward) formulation from figure \autoref{intro_fib}.
 
 What happens if we call \mintinline{postgresql}{SELECT fib(4)}? The planner takes some time to have a close look at the query inside fib to make an execution plan and then executes this plan. During execution, a number of subcalls occurs that need to be executed before the surrounding query can be evaluated. Everytime, the UDF is replanned and a callstack will grow as illustrated in \autoref{fib_4_callstack}. As soon as a node has the result of all of its children, the node can itself return a result. The leaves of the tree can therefore return a result immediately and the evaluation starts bottom-up (\autoref{fib_4_callstack_evaluation}). 

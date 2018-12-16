@@ -1,7 +1,8 @@
 <eval_recursive_scenario(call_site_1, ..., call_site_n)> :=
   SELECT 
-    results.in_1                                                             AS in_1, 
-    <scenario.query[results.call_1 / fib(scenario.callsites[1].arg_1),
+    results.in_1                                                         AS in_1, 
+    <scenario.query[results.in_1 / $1,
+                    results.call_1 / fib(scenario.callsites[1].arg_1),
                                         ...
                     results.call_n / fib(scenario.callsites[n].arg_n)] > AS res 
   FROM ( -- Table (c)

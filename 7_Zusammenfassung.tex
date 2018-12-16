@@ -1,6 +1,10 @@
 \chapter{Conclusion and future work} \label{conclusion}
 Analyzing the callstack to limit rows needed to carry around
 Remove calls from the callstack when all dependant calls are evauated
+
+\section{\texttt{STRICT} functions}
+Functions tagged as \texttt{STRICT} are functions that return \texttt{NULL} straight away if they any of their arguments is \texttt{NULL}. The actual function is not evaluated in this case. In this case no call with a \textit{NULL} argument will lead to subsequent callsites, so that all recursive scenarios have non-\texttt{NULL} arguments. Calls with a \texttt{NULL}-argument are therefore only required to consider when collecting basecases. During evaluation all arguments are not nullable and \texttt{x IS NOT DISTINCT FROM y} can be simplified to \textit{x = y}. This may yield to a large performance gain as the implicit \texttt{x = y OR (x IS NULL AND y IS NULL)} is removed wich degrades join-performance.
+
 \section{Closures of SQL-fragments containing row-variables}
 \section{Tabular return types}
 \section{Evaluation of predicate-parts in own CTE}
@@ -8,6 +12,9 @@ Remove calls from the callstack when all dependant calls are evauated
 \section{Iterative recursive calls to limit size of evaluation-table}
 \section{Indices}
 \section{Translation from and to other languages}
+
+Single callsite => no calsite id required
+
 %%%%%%%%%%%%%%%%%%%%%%%%%
 % Was war das Ziel?
 % Was habe ich getan?

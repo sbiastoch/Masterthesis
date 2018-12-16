@@ -8,14 +8,41 @@
 %%%%%%%%%%%%%%%%%%%%%%%%
 \chapter[Appendix]{Appendix}
 \phantomsection
+\section{Examples of Rule application}
+\subsection{\RWHEN-rule}
+\begin{prooftree}
+    \AxiomC{}\RightLabel{\scriptsize(base)}
+    \UnaryInfC{\lstinputlisting{snippets/rules/fib/03-case-when.sql}}
+    \AxiomC{}\RightLabel{\scriptsize(base)}
+    \UnaryInfC{\lstinputlisting{snippets/rules/fib/03-case-then.sql}}
+    \AxiomC{\vdots}\RightLabel{\scriptsize(else)}
+    \UnaryInfC{\lstinputlisting{snippets/rules/fib/03-case-else.sql}}
+    \RightLabel{\scriptsize(when)}
+    \TrinaryInfC{\lstinputlisting{snippets/rules/fib/02-case.sql}}
+\end{prooftree}
+
+
 \section{Example translations}
 \subsection{\texttt{fib}}
-\begin{figure}\footnotesize
+\begin{figure}
     \centering
     \sqlcode{snippets/fib_callstack.sql}
     \caption{\texttt{callstack}-CTE as standalone query. Note that the UDF argument \texttt{\$1} is replaced with a SQL-variable \texttt{:n}}
     \label{fib:callstack_cte_complete}
 \end{figure}
+\subsection{\texttt{gcd} without optimization}
+\subsection{\texttt{gcd} with single recursion optimization}
+\subsection{\texttt{gcd} with tail recursive optimization}
+\subsection{\texttt{sieve} without optimization}
+\subsection{\texttt{sieve} with constant argument removal}
 \section{Conditional normalization}
+\section{Usage of \texttt{twr}, a Haskell implementation for PostgreSQL}
 \sqlcode{snippets/conditional_normalization.sql}\label{sql:cond_norm}
+\section{Evaluation}
+\begin{figure}
+    \centering
+    \sqlcode{appendix/paramN.sql}
+    \caption{UDFs with varying number of arguments used for \autoref{fig:paramN}}
+    \label{udfs:paramN}
+\end{figure}
 %%%%%%%%%%%%%%%%%%%%%%%%
