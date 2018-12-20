@@ -1,73 +1,159 @@
 \chapter{Evaluation and discussion}\label{results_discussion}
 
-To protected PostgreSQL-process against infinite recursion, the execution stack is limited in size. The default in PostgreSQL 10.6 (\texttt{max\_stack\_depth}) is set to 2MB and can be manually increased. The maximum stack size is capped by the settings of the Operating System.\\
+To verify the claims made in the introduction about the performance of the translations, I compare runtimes of various versions of the same functions. I compare the original function against its translation. I measure the effect of the presented optimizations and compare the translation against a manually optimized formulation.
+
+Plots are drawn using logarithmic x- and y-axis to depict the large differences in runtimes. Addiotionally, polynomial growth is better to differentiate from exponential when using logscales. A polynomial function on a xy-logscale appears as a straight line, the slope determines the degree of the polynomial. A linear function, ie. a polynomial of degree 1 has a slope of 1. I do not examine the complexity of the code but make some estimates based on the measured values, where appropriate.
+
+\paragraph*{Evaluation setup}
+The evaluations were run on a System running Ubuntu 18.04.1 with 4.15 Linux-Kernel, AMD 1900X with 8x 3.80GHz (16 Threads), 256MB NVMe SSD and 16GB DDR4 RAM. PostgreSQL 10.6 with default settings, if not stated otherwise.
+
+To protected PostgreSQL-processes against infinite recursion, the execution stack is limited in size. The default in PostgreSQL 10.6 (\texttt{max\_stack\_depth}) is 2MB and can be manually increased. The maximum stack size is capped by the settings of the Operating System.\\
 The available working memory (\texttt{work\_mem}) specifies how much memory can be consumed by in-memory operations like sorting or hashing. If the memory is exceeded, temporary results are stored on disk. Per default the working memory is set to 2MB. \cite[p. 512 ff.]{psql}
 
-To fully exploit the capabilities of each implementation variant, the stack size is set to 7680kB (the limit of the OS) and working memory to 512MB. This way the recursive variant will not be terminated (too) early and the translation should be able to perform all computations in memory.
+To fully exploit the capabilities of each implementation variant, the \texttt{max\_stack\_size} is set to 7680kB (the limit of the OS) and working memory (\texttt{work\_mem}) to 512MB. This way recursive functions can run longer before being killed. The high working memory enables operations like sorting or hashing to be performed in memory, even for larger inputs.
 
-Using auto\_explain to track execution slows down by ca. 25\%.
+The original, recursive functions were run until the stack size was exceeded and the function was killed. The translations were run (where possibily) at least as long as the original function until the trend of the curves seems to be clear.
 
+To track plans and times of parts of the translation the extension \texttt{auto\_explain} was used with \texttt{log\_nested\_statements}, \texttt{log\_verbose} and \texttt{log\_timing} enabled. Logging format (\texttt{log\_format}) was set to JSON. With tracking enabled runtimes were constantly about 25\% slower.
 
-\section{Original vs Translated Fibonacci Function}
+\section{Generic Template}
 
-\begin{figure}[h]
+The generic template is the default template without any UDF-specific optimizations as presented in \autoref{template}. The performance of the fibonacci function (\autoref{udf:fib}) from the introduction is shown in \autoref{fig:fib_times}.
+
+\begin{figure}[h!]
     \centering
-    \includesvg{plots/fib_orig_vs_trans}
-    \caption{Run time of fibonacci function in various versions.}
+    \includesvg{plots/fib}
+    \caption{Run time of the fibonacci function in its recursive version and the automatic translation. Additionally, a manually optimized version is compared.}
     \label{fig:fib_times}
 \end{figure}
-Runtimes vary greatly between the original recursive implementation, the automatic translation and a third, manually optimized fibonacci function\footnote{From \url{https://wiki.postgresql.org/wiki/Fibonacci_Numbers}, accessed: 15/12/2018}. To represent the wide variety the plots are drawed with logarithmic scales.
 
-The original implementation is faster for very small inputs as it has less overhead then the translation. Additionally, the first two (fib(\$n-1) and fib(\$n-2)) calls are inlined. Anyway, the runtime of the original function grows very fast, so that $fib(30)$ already takes minutes. The translated function on the other hand is much faster. Where the original takes minutes, the translation is finished under 10ms. Even for fib(1000) the call returns after around 2 seconds. Yet, the translation cannot keep up with the manually optimized function. The same input here yields an result after a few milliseconds. But even here the runtime grows strongly as the inputs gets even larger. Yet, other limitations finally stop computing even larger fibonacci numbers: Somewhere between fib(600000) and fib(700000) the numeric datatype (which can represent numbers up to 131072 digits \cite[p. 124 f.]{psql}) fails with an overflow. That said, the manual optimized implementation is "as good as we can get".
+, the automatic translation and the third, manually optimized fibonacci function\footnote{From \url{https://wiki.postgresql.org/wiki/Fibonacci_Numbers}, accessed: 15/12/2018}. To represent the wide variety the plots are drawed with logarithmic scales.
 
-The plot shows nicely how the automatic translation is magnitudes faster as the functional implemented original -- but the manually optimized implementation is again magnitudes faster. This affirms our initial claim, that our automatic translation gives you an great instant speed-up. Where the naive implementation gets slow, you can use the translation and the run-time drops from minutes to milliseconds. Where the translation runs for minutes, nothing else remains and you have to manually optimize the function. 
+Runtimes vary greatly between the three implementation. The original implementation is faster for very small inputs as it has less overhead then the translation. Additionally, the first two (\texttt{fib(\$n-1)} and \texttt{fib(\$n-2)}) calls are inlined, which reduces overhead further. Yet, the runtime of the original function grows very fast, so that \texttt{fib(30)} already takes minutes. Finally, the recursive UDF is killed by PostgreSQL at a input of 32???
 
-\subsection{Degree of recursion, DP}
+The translated function on the other hand is much faster. Where the original takes minutes, the translation is finished under 10ms. Even for \texttt{fib(1000)} the call returns after around 2 seconds. For very small inputs the runtime seems to be nearly constant, possibly because the tiny computations are marginalized by the constant overhead of the template. After leveling up, the runtime of the translation has a slope of approximietly 2, indicating quadratically growth.
 
-\begin{figure}[h]
+Yet, the translation cannot keep up with the manually optimized function. The step from the translation to the manually optimized version is similar in magnitude as the step from the original to the translation: The runtime drops from minutes to milliseconds.\\
+But even here the runtime grows as the inputs gets even larger, but slower. The implementation provided runs nearly in linear time, exploiting that only two values needs to be remembered to compute the next value.\\
+
+Eventually, other limitations finally stop computing even larger fibonacci numbers in PostgreSQL: Somewhere between fib(600000) and fib(700000) the numeric datatype (which can represent numbers up to 131072 digits! \cite[p. 124 f.]{psql}) fails with an overflow. That said, the manual optimized implementation is "as good as we can get in SQL".
+
+Each implementation has changed the complexity-class of the implementation. The recursive implementation of \texttt{fib} is exponential \cite{} as previously computed values are repeatedly recomputed. Actually, the calltrees of the callsites are identical except a single call.
+
+Problems with overlapping subproblems as with fibonacci are subject to an optimization technique called "Dynamic Programming" and "Memoization". Starting from optimal subproblems solutions of larger problems are incremental computed. Dynamic Programming requires you therefore to reformulate the algorithm to implement this approach. Memoization solves the problem top-down, keeping the original recursive structure of the function. For each call it is checked if this call already was evaluated. If so, the saved value is returned. Our translation uses the original recursive formulation and applies automatic memoization, avoiding any redundant calls.
+
+If an algorithm has no overlapping subproblems and there are no redundant calls, memoization gives no speedup. Each calltree of the callsites is disjunct. The evaluation of this algorithms grounds on recursivly dividing the problem in disjunct subproblems. The results are than recursivly merged to construct the final result ("divide and conquer"). An example with two callsites is \texttt{quicksort} (\autoref{udfs:quicksort}).
+
+\begin{figure}[h!]
     \centering
-    \includesvg{plots/branchN_dp}
-    \caption{Comparision of UDF \texttt{branchN} (see \autoref{udfs:branchN}).}
-    \label{fig:branchN}
+    \includesvg{plots/nonoverlapping}
+    \caption{Runtimes for quicksort as a quadratic divide and conquer algorithm.}
+    \label{fig:nonoverlapping_times}
 \end{figure}
 
-\subsection{Degree of recursion, DQ}
+\autoref{fig:nonoverlapping_times} shows that the translation still causes a speedup ca. by factor 10 for \texttt{quicksort}. This is remarkable because the function does not profit from memoization. This plot illustrates boldly that PostgreSQL is highly optimized for efficient operations on tables and not for efficient function calls.
 
-\begin{figure}[h]
+As last aspect of the generic translation, let us have a look at the fraction of time spent in each part of the translation \autoref{fig:split_times}. We see that the evaluation is by far the costliest part of the translation. Notably is the large fraction that the bare result selection takes. This can be explained, that each iteration of the evaluation works only on a linear growing working-table and appends its results without duplicate checking to the final result. The total result include all the lots of duplicates is only seen when selecting the result. Therefore both parts have constantly a significant influence of the total runtime, opposed to callgraph and basecase, that marginalize over time.
+
+\begin{figure}[h!]
     \centering
-    \includesvg{plots/branchN_dq}
-    \caption{Comparision of UDF \texttt{branchN} (see \autoref{udfs:branchN}).}
-    \label{fig:branchN}
+    \includesvg{plots/split}
+    \caption{Percentage of runtime for each part of the translation of \texttt{fib}}
+    \label{fig:split_times}
 \end{figure}
 
 
-\subsection{Varying number of arguments}
-
+\iffalse
 \begin{figure}[h]
     \centering
-    \includesvg{plots/paramN_noopt}
-    \caption{Run time of a same function (see \autoref{udfs:paramN}) with varying argument numbers. The translations are run using the generic template, without optimizations.}
+    \includesvg{plots/recN}
+    \caption{Impact of the number of scenarios on the runtime. Single recursive function with expensive predicates}
+    \label{fig:recn_times}
+\end{figure}
+
+Impact of number of scenarios (Overhead by predicates) \autoref{fig:recn_times}
+
+\fi
+
+
+
+
+\section{Single and Tail Recursion}
+
+Functions with only one callsite per scenario are called single recursive. I count them in the context of this thesis to the group of divide and conquer algorithms, as they have no overlapping subproblems. I use the \texttt{sum} (\autoref{udfs:sum}) function as exmaple in the following to study the performance of the translation.
+
+\begin{figure}[h!]
+    \centering
+    \includesvg{plots/sum}
+    \caption{Sum as example for a single recursive function. Calls to the original \texttt{sum} eventually exceed stack depth.}
+    \label{fig:factorial_times}
+\end{figure}
+
+
+Surprisingly, the generic translation of \texttt{sum} yields to a runtime even worse than the original quicksort function. Quicksort was run with an array of descending numbers, thus the runtime equals the worst case of $O(n^2)$. The original single recursive version of \texttt{sum} grows roughly linear as we can see from the plot. The generic translation of \texttt{sum} degrades the performance of the linear function heavily. It is even worse than quicksort (\autoref{fig:nonoverlapping_times}), which is quadratic!
+
+\autoref{fig:split_sr_times} depicts the fraction of time each part of the translation consumes from the total computation time for a given input. Left, the data is taken from the badly performing, generic translation. Right, the translation using the single recursive optimization. We see, that in the generic translation evaluation marginalizes all other parts of the translation.
+
+\begin{figure}[h!]
+    \centering
+    \includesvg{plots/split_sr}
+    \caption{Fraction of total runtime spend in each part of the translation of \texttt{sum}.}
+    \label{fig:split_sr_times}
+\end{figure}
+
+This slowdown is apparently caused by the growth of the evaluation CTE. All previous results are accumulated there and each result adds all previous results to allow access to results from all earlier iterations. This behaviour makes the evaluation-CTE grow quadratically, even if the original function is linear.
+
+But this does not explain why the function performs worse than the quadratic, non-memoizable quicksort? The problem is caused by the wrong guess of the query planner about the number of rows returned from the scan of \texttt{callgraph}. During scenario-evaluation the CTE \texttt{e} (proxying \texttt{evaluation}) is joined with \texttt{callgraph} two times: Once for joining callsites with their results, here a hash join is used ($O(n+m)$, good). The other join is caused by the \texttt{NOT EXISTS} which is rewritten into a \texttt{LEFT JOIN}.
+
+\begin{figure}[h!]
+    \centering\scriptsize
+    \begin{verbatim}
+->  Nested Loop Anti Join  (cost=0.00..20.54 rows=1 width=68) (actual time=0.118..15.206 rows=250 loops=500)
+	Output: c_3.in_1, c_3.call_site, c_3.out_1
+	Join Filter: (e_1.in_1 = c_3.in_1)
+	Rows Removed by Join Filter: 83333
+	->  CTE Scan on callgraph c_3  (cost=0.00..4.29 rows=1 width=68) (actual time=0.000..0.077 rows=499 loops=500)
+	    Output: c_3.in_1, c_3.call_site, c_3.out_1
+	    Filter: (c_3.call_site = ANY ('{1}'::integer[]))
+	    Rows Removed by Filter: 1
+	->  CTE Scan on e e_1  (cost=0.00..10.00 rows=500 width=32) (actual time=0.000..0.011 rows=168 loops=249500)
+	    Output: e_1.in_1, e_1.res
+    \end{verbatim}
+    \caption{Extract of the query plan of scenario evaluation from \texttt{sum(500}, translated using the generic template.}
+    \label{plan:sum}
+\end{figure}
+
+The planner assumes that only a single row is returned from \texttt{callgraph} after filtering with \texttt{c.callsite\_id IN (1)} and chooses therefore to make a \textit{nested loop anti join}. Nested loop joins are a good choice if one table is small, because the runtime is $O(nm)$ \cite{}. But the UDF has only a single callsite, therefore the predicate is not selective at all and not one but all $n$ rows are returned. The working-table of evaluation has on average a size of $n/2$. Therefore, the join complexity is in $O(n^2)$ - for a single iteration. 
+
+Evaluation of the callgraph happens in a level-wise fashion, one level per iteration. Recalling \autoref{}, the callgraph of a single recursive function is just a linked list so the depth of the callgraph is $n$. For quicksort the callgraph is a binary tree, so the depth is just $log_2(n)$. In sum, the generic translation of a single recursive functions increases complexity from $O(n)$ to $O(n^3)$.
+
+Using the template for single recursion fixes this issue. The template does not accumulate all previous results in the current result and thus the working-table does not grow with $n$ but yields always only a single row. The size of \texttt{evaluation} remains linear.
+
+The original function starts out linear but slows down a bit for large inputs before exceeding stack size. The speedup by the optimized translation is roughly by factor 10, with no limitation by the maximum stack size.
+
+The tail recursive optimization speeds up performance constantly by the factor of approx. 2. This seems natural considering that \autoref{fig:split_sr_times} shows that the evaluation-CTE, which is omitted in the tail recursive template, accounts for ca. 40\% of the runtime.
+
+\section{Template Optimizations}
+
+
+\begin{figure}[h!]
+    \centering
+    \includesvg{plots/paramN_opts}
+    \caption{Impact of the different optimizations, compared to the original function \texttt{param4} (see \autoref{udfs:paramN})}
     \label{fig:paramN}
 \end{figure}
+
+
 
 \autoref{fig:paramN} looks surprising. The original functions perform all equally and much better than the translations. Even more interstingly, the UDF with just one argument performs worst. This behaviour is surprising as we would guess that a simpler functions performs better in the translation because there is less data to manage and jonining tables is easier.\\
 A first idea is, that the additional arguments give the functions more selective join predicates. Yet, this cannot be the case as the additional arguments of the used functions are just the arguments passed to the function, so the values are equal for all calls.\\
-The reason for the big difference lays in the join order of the evaluation, as the query plan reveals. The function with one argument and n=200 makes first a nested loops anti join to join \texttt{evaluation} (rows=500, actual=68) with \texttt{callgraph} (rows=1, actual=201). The result (rows=1, actual=100) is joined with an hash join with \texttt{evaluation} (rows=500, actual=101).\\
+The reason for the big difference lays probably in the join order of the evaluation-subqueries, as the query plan reveals \autoref{}. The function with one argument and n=200 makes first a nested loops anti join to join \texttt{evaluation} (rows=500, actual=68) with \texttt{callgraph} (rows=1, actual=201). The result (rows=1, actual=100) is joined with an hash join with \texttt{evaluation} (rows=500, actual=101).\\
 The UDF with four arguments has flipped the order of the joins: First a hash join between \texttt{evaluation} (rows=940, actual=102) and \texttt{callgraph} (rows=100, actual=201) happens. The result (rows=1, actual=101) is joined with a nested loop anti-join with \texttt{evaluation} (rows=940, actual=69).
 
-The problem is caused by the wrong guess about the number of rows returned from the scan of \texttt{callgraph}. The plans (see \autoref{plan:paramN}) are identical except for scenario-evaluation. During scenario-evaluation the CTE \texttt{e} (proxying \texttt{evaluation}) is joined with \texttt{callgraph} two times: Once for finding callsites of evaluated calls and once to check if the result is not yet calculated. The planner assumes that only a single row is returned using the filter \texttt{c.callsite\_id IN (1)}. But the UDF has only a single callsite, therefore the predicate is not selective at all.\\
-The plan for the function with a single argument uses a \textit{nested loop anti join} to join the (supposed) single row from \texttt{callgraph} with \texttt{evaluation}. Nested Loop Joins are  a good choice when one table is small, otherwise a hash join performs better. The other plan uses first a hash join and than the nested loop join. As result, the nested loop join is executed on a smaller table which explains the better run-time. The plan from the UDF with one argument performs a nested loop join on tables with 68 and 201 rows, while in the other plan the inputs are sized 69 and 101 rows.
+Nested Loop Joins are a good choice when one table is small, otherwise a hash join performs better. The other plan uses first a hash join and than the nested loop join. As result, the nested loop join is executed on a smaller table which explains the better run-time. The plan from the UDF with one argument performs a nested loop join on tables with 68 and 201 rows, while in the other plan the inputs are sized 69 and 101 rows.
 
 Now to the observation that the original performs better than the translation. This can be explained by the property, that the given function is linear recursive. No branching occurs and no memoization can be exploited. The overhead of the translation is significant is such a case: The evaluation-CTE adds in each step all the previous results to the new result. The number of rows is therefore $(0 + 1) + (1 + 1) + (2 + 1) + \dots + (n + 1) = \frac{n(n+1)}{2}$ and thus in $O(n^2)$. With the translation, we have made a linear function quadratically. Note that the results were obtained with optimizations disabled. So there is hope, as we see in the next section comparing optimizations to their originals.
 
-\subsection{Optimizations}
-
-\begin{figure}[h]
-    \centering
-    \includesvg{plots/paramN_opts}
-    \caption{Comparision of UDF \texttt{param4} (see \autoref{udfs:paramN}) with varying optimizations.}
-    \label{fig:paramN}
-\end{figure}
 
 % When limiting stack size to 100kb, param1_tr(320) is the first argument where it dies with "stack depth limit exceeded". As the function is nearly as simple as it gets, is seems to be valid to assume as lower bound that SQL will consume 1/3 kB per layer on the callstack. With default OS settings of max of 8MB on my machine, this means a maximum recursion depth of not more than roughly 25000 layers.  
 
@@ -80,16 +166,57 @@ Now to the observation that the original performs better than the translation. T
 \end{figure}
 
 
-\section{Advantages} Moimization, memory limitation, query planner
-\section{Original vs. Translation}
-\subsection{Number of recursive cases}
-\subsection{Number of basecases}
-\subsection{Number of parameters}
-\subsection{Branching factor}
 
-\section{Optimizations}
-\subsection{Linear Recursion}
-\subsection{Tail Recursive}
-\subsection{Constant Parameters}
+\section{Future work}
 
-\section{Bottlenecks}
+There are various promising paths for future work. The template can be tweaked further and the callgraph could be analysed to optimize evaluation.
+
+\subsection{Template optimization}
+The template is already highly optimized but a number of inefficiencies need to be fixed or studied in more depth.
+
+\paragraph*{Evaluation of predicate-parts in own CTE}
+Predicates are currently first expanded to stand-alone predicates during scenario analysis and evaluated as a whole once for all callsites per scneario during callgraph generation. Each predicate duplicates all the previous predicates by including them as negation. If each part is evaluated once and then just referenced in further predicates, this redundant evaluations can be eliminated. Queries with costly predicates and many scenarios would profit from this small change.
+
+\paragraph*{LIMITs}
+In the evaluation we have seen that wrong guesses have led the query planner to serious misconceptions, impact runtime severly. By adding explicit \texttt{LIMIT}s to subqueries we give the planner explicit information about how many rows to expect. Futhermore, expensive joins can stopped as soon as the first and only row has been returned. For example the single recursive template will always just return a single row per iteration of the evaluation-CTE. Therefore, scenario evaluation can be stopped after the only row to expect is returned.\\
+The same is applicable for final result collection: Instead of doing a \textit{DISTINCT}, a \textit{LIMIT 1} would have the same effect. Definitivly there are further possibilities to add explicit limit statements, maybe from an analysis of the callgraph.
+
+\paragraph*{NON STRICT functions}
+Functions tagged as \texttt{STRICT} are functions that return \texttt{NULL} straight away if they any of their arguments is \texttt{NULL}. The actual function is not evaluated in this case. In this case no call with a \textit{NULL} argument will lead to subsequent callsites, so that all recursive scenarios have non-\texttt{NULL} arguments. Calls with a \texttt{NULL}-argument are therefore only required to consider when collecting basecases. During evaluation all arguments are not nullable and \texttt{x IS NOT DISTINCT FROM y} can be simplified to \textit{x = y}. This may yield to a large performance gain as the implicit \texttt{x = y OR (x IS NULL AND y IS NULL)} is removed wich degrades join-performance.
+
+\subsection{Extend applicability}
+
+The current translation template does not work for every recursive UDF. It would be very nice if some of the constraints could be lifted.
+
+\paragraph*{Allow row-variables in predicates and arguments}
+This is a constraint that limits the real world usage of the translation most. SQL is made for operations on tabular data but the translation barely support this yet. The challange is here to extract an evaluable fragment of code from an arbitrary position in an arbitraryly nested query. The fragment must be evaluated for every possible value of its row-reference. The callgraph gets so a new dimension: A scenario is evaluable if all callsites have results for every row available.
+Apparently, there a some complexities and challenges which must be solved first. Yet, the results of this thesis which just provides a first formalization and implementation is very promosing.
+
+\paragraph*{Tabular return types}
+
+\paragraph*{Allow dependant callsites}
+Another constraint is that callsites may not depend on each other. Recursive function arguments like $f(f(n-1))$ are not allowed as the argument must be evaluated in advance to create the callgraph. The Ackermann function is not translateable for exmaple.
+
+Another form of dependency between callsites is of two recursive predicates at the same level. This is unfortunate, because any form of backtracking algorithm uses this pattern: If recursive call with current arguments fails, backtrack recursively. The recursive call in the predicate would cause the scenario analysis to return the entire fragment as a single scenario.\\
+This limitation could be lifted with an iterative partial construction of the callgraph.
+
+\paragraph*{Translation from and to other languages}
+...
+
+\subsection{Optimize evaluation}
+
+The callgraph is a precious source of information about the behaviour of the recursive function. If we can exploit this information, evaluation can happen much more efficiently.
+
+The main problem of the template is the quadratical growth of the evaluation-CTE. Actually, with the callgraph we already have all data at hand to fix this: The callgraph encodes the dependencies of the results. In each iteration of evaluation, one topological level of the callgraph is evaluated. It is easy to check which nodes in the callgraph have now no more dependencies to callsites that are not already evaluated. Those values can be safely removed from the result set, as this results will not be needed again.
+
+An other possibility is to analysis the maximum dependency distance to include only the last $n$ results in every iterations result. For Fibonacci such a analysis would limit the size of the working table constantly to 2. This approach could give a great speedup for many benign problems and would be easy to implement.
+
+Furthermore, we could analyze the callgraph and annotate points of interest. It may be beneficial to prune the evaluation table periodically or at advantageous points, eg. when a large subtree is completely evaluated.
+
+The problem with the workaround with RCTEs to allow back-references is that there will always accumulate redundant rows. If a result of a callsite is $k$ nodes away from its most distant caller, there will be $k$ duplicates. These duplicates cannot be removed afterwards from the final result of the CTE and need to be traversed in order to select the final result.
+This growth could be limited if the translation is started recursively again to discard these old duplicates. An annotated callgraph would help to detect points where many rows can be discarded and only few needs to be seeded into the newly started evaluation.
+
+An other option is to persist tables in an (maybe unlogged and temporary) table. This has the advantage that rows can be easilly removed if not required anymore. Also, tables could be indexed and different processes could parallely work together. Especially divide and conquere algorithms could benefit as they need only few evaluation passes and produce a large number of disjunct calls.\\
+Persisted tables could also be used to memoize calls not only from the current query, but also from earlier queries. This could be useful to implement a caching mechanism.
+
+Analyzing the callgraph may reveal independant subtrees that could be evaluated in parallel. This could either happen by manually triggering parallel execution by starting own processes that access common tables or by utilizing PostgreSQL own parallel-query capabilities. 

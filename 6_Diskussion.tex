@@ -54,14 +54,3 @@ The same goes for arguments of callsites.
 \caption{Example of a (forbidden) predicate that has references to outside tables and thus returns a table of predicates.}
 \label{lst:from_nonselfcontained}
 \end{listing}
-
-\section{Problem specific optimization vs. automatic translation}
-Without doubt, any problem specific optimization can outperform our automatic generated solution. We cannot exploit domain specific properties that constrain the solution space. Lets take again for example the fibonacci-function. By its definition, it is completely sufficient to keep only the last two numbers 
-
-Nevertheless this does not render our solution less valuable: Problem specific optimizations may exists, but usually it is hard do uncover and exploit them. In practice, the effort to come up with an optimal solution is not worth all the effort when a "good enough" solution would also fit the use-case. Furthermore, the maintainability of a short and simple, declarative piece of code is much higher than the optimized version, that exploits subtle properties of the problem, the database-system or uses other nifty tweaks.
-
-Exmaple threaded binary tree for iterative tree traversal to keep stack size manageable => smart, but hard to find!
-
-[Example Plots for fib, sieve..?]
-
-\section{Related work}\label{related_work}

@@ -876,7 +876,7 @@ Callsites within aggregate-functions are forbidden by the restriction that there
 
 
 
-\chapter{Query templates}
+\chapter{Query templates}\label{template}
 % Evaluation of recursive functions
 The translated functions follow all a common schema in general. First, the callstack-graph is created, top-down until the basecases are reached. The basecases are then evaluated with the according arguments discovered by the callgraph. Evaluation continues bottom-up as new recursive cases have results of their callsites available.
 

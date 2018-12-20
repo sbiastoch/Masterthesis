@@ -1,19 +1,4 @@
-\chapter{Conclusion and future work} \label{conclusion}
-Analyzing the callstack to limit rows needed to carry around
-Remove calls from the callstack when all dependant calls are evauated
-
-\section{\texttt{STRICT} functions}
-Functions tagged as \texttt{STRICT} are functions that return \texttt{NULL} straight away if they any of their arguments is \texttt{NULL}. The actual function is not evaluated in this case. In this case no call with a \textit{NULL} argument will lead to subsequent callsites, so that all recursive scenarios have non-\texttt{NULL} arguments. Calls with a \texttt{NULL}-argument are therefore only required to consider when collecting basecases. During evaluation all arguments are not nullable and \texttt{x IS NOT DISTINCT FROM y} can be simplified to \textit{x = y}. This may yield to a large performance gain as the implicit \texttt{x = y OR (x IS NULL AND y IS NULL)} is removed wich degrades join-performance.
-
-\section{Closures of SQL-fragments containing row-variables}
-\section{Tabular return types}
-\section{Evaluation of predicate-parts in own CTE}
-\section{Parallel execution of in dependant callstack-subtrees}
-\section{Iterative recursive calls to limit size of evaluation-table}
-\section{Indices}
-\section{Translation from and to other languages}
-
-Single callsite => no calsite id required
+\chapter{Conclusion} \label{conclusion}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%
 % Was war das Ziel?
@@ -22,5 +7,16 @@ Single callsite => no calsite id required
 % Was lernen wir daraus?
 % "Woran könnte man weiter forschen?"
 %%%%%%%%%%%%%%%%%%%%%%%%%
+
+- For very very small inputs, original is better because of less overhead
+- Translation is better than original, but manual optimizations always outperforms translation
+- If the problem has overlapping subproblems, the speed up is large because translation implements automatic memoization
+
+
+Without doubt, any problem specific optimization can outperform our automatic generated solution. We cannot exploit domain specific properties that constrain the solution space. Lets take again for example the fibonacci-function. By its definition, it is completely sufficient to keep only the last two numbers 
+
+Nevertheless this does not render our solution less valuable: Problem specific optimizations may exists, but usually it is hard do uncover and exploit them. In practice, the effort to come up with an optimal solution is not worth all the effort when a "good enough" solution would also fit the use-case. Furthermore, the maintainability of a short and simple, declarative piece of code is much higher than the optimized version, that exploits subtle properties of the problem, the database-system or uses other nifty tweaks.
+
+%Exmaple: threaded binary tree for iterative tree traversal to keep stack size manageable => smart, but hard to find!
 \section*{Acknowledgements}
 Thanks to Chris, Denis, Grust, proofreader, ...
