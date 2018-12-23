@@ -21,6 +21,8 @@ But there exist more ways of formulating basecases which are harder do detect, l
 \sqlcode{snippets/no_basecases.sql}
 Here, the basecase occurs when the table containing the recursive call is empty and therefore no recursive call happens. Examples like this show, that there is a variety of possibilities to write recursive functions without using an explicit \CASE. Translations for many of them may exist, but we focus in the following on recursive queries with explicit case-distinctions utilizing \CASE-expressions.
 
+When an element in the \texttt{FROM}-list yields no rows, the \texttt{SELECT}- and \texttt{WHERE}-clauses are not executed.
+
 \subsection{Predicates and callsite-arguments may only reference CTEs and schema tables}
 One challenge is slicing the function, the other is evaluating the arguments idependently from the surrounding query. While the first is mostly solved by my thesis, the latter is worth further examination to lift the constraints on callsite-arguments.
 
