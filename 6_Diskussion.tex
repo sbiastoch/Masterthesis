@@ -1,21 +1,3 @@
-
-\subsection{Properties of the translation}
-Equivalence for mathematical functions is intuitively defined as $f: S \mapsto T, g: U \mapsto V, \forall x \in S: f(x) = g(x)$ with $S = U, T = V$. If the domain, ie. the function signature, matches and the results are equal for every input, the functions are considered to be equivalent. We have to extend this definition a little to bear the newly introduced aspects of real (database-)world procedures.
-
-The signatures of a PostgreSQL-UDF does contain many different keywords reflecting properties of the function to give hints to the database-system how to UDF is callable or what kind of optimizations are applicable. Therefore, we require the translation not only to match the function signature (say: $gcd(int, int) : int$), but also the complete CREATE FUNCTION-block surrounding the actual function body. If a function is marked eg. as IMMUTABLE, the translation preserves this property. The only exception are UDFs that are marked PARALLEL SAFE, that is changed to PARALLEL RESTRICTED since the translation uses non-parallel safe operations like CTE-Scans (15.4. Parallel Safety).
-
-In general, we cannot assume that UDFs are total, ie. that they terminate for all possible inputs from the input space. Assume a function that only terminates for positive inputs or may throw a division-by-zero error. This behaviour must be preserved by the translation, otherwise it would be not be clear if an error is actual a bug in the original function or introduced by the translation.
-
-RETURNS NULL ON NULL INPUT/STRICT\\
-VARIADIC (argument list)\\
-DEFAULTs\\
-argmodes?\\
-positional vs named notation: breaks calls!
-
-
-
-
-
 \section{Constraints of our approach}
 Our approach can optimize a wide range of recursive UDFs, but there exist cases where a translation would not be beneficial or is not possible with my current implementation. I will characterize the set of translateable UDFs by formulating a number of constraints that must hold for a given query. Otherwise, the translation will fail or lead to an incorrect translation.
  

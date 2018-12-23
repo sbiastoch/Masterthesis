@@ -195,7 +195,7 @@ Apparently, there a some complexities and challenges which must be solved first.
 \paragraph*{Tabular return types}
 
 \paragraph*{Allow dependant callsites}
-Another constraint is that callsites may not depend on each other. Recursive function arguments like $f(f(n-1))$ are not allowed as the argument must be evaluated in advance to create the callgraph. The Ackermann function is not translateable for exmaple.
+Another constraint is that callsites may not depend on each other. Recursive function arguments like $f(f(n-1))$ are not allowed as the argument must be evaluated in advance to create the callgraph. The Ackermann function is a prominent example.
 
 Another form of dependency between callsites is of two recursive predicates at the same level. This is unfortunate, because any form of backtracking algorithm uses this pattern: If recursive call with current arguments fails, backtrack recursively. The recursive call in the predicate would cause the scenario analysis to return the entire fragment as a single scenario.\\
 This limitation could be lifted with an iterative partial construction of the callgraph.

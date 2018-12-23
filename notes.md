@@ -11,3 +11,4 @@ O(n) => Omega
 
 
 => Only postgres allows recursive UDFs
+uds recursion expensive because plan saved
