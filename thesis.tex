@@ -32,6 +32,10 @@
 \usepackage{tikz}
 \usetikzlibrary{positioning, calc, arrows, tikzmark}
 \usetikzlibrary{shapes.multipart}
+\usepackage{booktabs}
+\usepackage{colortbl}
+\usepackage{bigstrut}
+\usepackage{array}
 \usepackage{xcolor}
 \definecolor{red}{HTML}{8c0000}
 \definecolor{green}{HTML}{38775a}
@@ -97,6 +101,24 @@
     \draw[shorten <=0.2em, #1] (#2.west) -- (#3.east);
   \end{tikzpicture}
 }
+
+% SQL-table
+\newcommand{\col}[1]{\ensuremath{\texttt{#1}}}
+\newcolumntype{H}{>{\columncolor{black}\color{white}}c}
+\newcolumntype{P}{>{\columncolor{white}\color{white}}c}
+\newcommand{\colhd}[1]{\multicolumn{1}{H}{\strut\col{#1}}}
+\newcommand{\phantomhd}[1]{\multicolumn{1}{P}{\strut\col{#1}}}
+\newcommand{\mcolhd}[2]{\multicolumn{#1}{H}{\strut\col{#2}}}
+\newcommand{\keyhd}[1]{\multicolumn{1}{H}{\strut\underline{\smash{\col{#1}}}}}
+\newcommand{\tabname}[2]{%
+  \multicolumn{#1}{@{}l}{%
+    \begin{tikzpicture}[baseline]
+      \node [inner sep=1pt] (T) {\phantom{#2}};
+      \draw [fill=black]
+            (T.south west) {[rounded corners=2pt] -- (T.north west)  --
+            (T.north east)} -- (T.south east) -- cycle;
+      \node [inner sep=1pt,text=white] {#2};
+    \end{tikzpicture}}}
 
 % Do not make minted full width but only so wide as required
 \RecustomVerbatimEnvironment{Verbatim}{BVerbatim}{}

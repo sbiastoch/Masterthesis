@@ -58,17 +58,15 @@ Finally, the \textit{executor} recursively executes each node of the plan just a
 % But even the query planner is not the holy grail and there are queries that perform incredibly bad or are difficult to formulate in a way the query planner can find a efficient plan.
 
 % The most frequent form of reading queries are $\textit{SELECT s_1, s_2, ..., s_n FROM T_1, T_2, ..., T_n WHERE p}$-queries (S-F-W). The cartesian product $\texttt{T_1 \times T_2 \times \dots \times T_n}$ between the tables is built and the resulting rows are filtered by the predicate \texttt{p}. Finally, the output columns in the select-list are evaluated for each row, returning the output table.
-\section{Recursion}
+\section{Recursion in SQL}
 
 Recursion is a fundamental concept in everyday programming as well in computability-theory. Every recursive function consists of a number of different \textit{evaluation scenarios}. Some of them cause subsequent recursive calls (\textit{recursive scenarios}) and at least one scenario causes no recursive calls at all. Otherwise, the function will never terminate. We will call nonrecursive scenarios \textit{basecases}. The programmer usually uses conditionals to direct which scenario should be evaluated. For now, we assume that conditionals are states explcitily so that \textit{predicates} can be stated for each scenario. One of the main task of the translation is to collect the scenarios and identify their predicates.
-
-\subsection{Recursion in SQL}
 
 Recursive functions can be implemented in SQL in two ways: As User Defined Function (UDF) or as Recursive Common Table Expression (RCTE). UDFs are functions (actually procedures) as we know them: A function with a name, an argument list, a defined return type and a function body. Recursive CTEs are different, as they are no functions with explicit arguments but self-referential queries of a specific structure.
 
 I will go into detail on how they are used, evaluated and what optimizations can be performed by the query planner.
 
-\subsubsection{Recursive User Defined Functions}
+\subsection{Recursive User Defined Functions}
 Recursive functions can be created in PostgreSQL as User Defined Functions (UDFs). UDFs can be implemented in a wide range of languages but we consider SQL UDFs only as the original, pure SQL approach. There is also a number of options to specify the arguments. For my thesis I use just simple positional arguments without any modifiers.
 
 [Recursive UDF]
@@ -83,7 +81,7 @@ Under certain circumstances, PostgreSQL can optimize some function calls. Very s
 
 Identical calls to an IMMUTABLE function can be folded into a constant during planning. The impact on nonrecursive queries may be significant, but for recursive functions the impact is small.
 
-\subsubsection{Recursive Common Table Expressions}
+\subsection{Recursive Common Table Expressions}
 
 Common Table Expressions (CTEs) are a convenient way to define auxiliary queries once in advance to use them similar to temporary tables in the contained query. CTEs help breaking down a big query down to smaller individual parts. CTEs are only evaluated once, which can improve performance. On the other hand, CTEs are known to be "optimization fences" as the planner is not able to perform predicate pushdown into CTEs.
 

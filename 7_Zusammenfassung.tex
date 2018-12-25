@@ -17,6 +17,12 @@ Without doubt, any problem specific optimization can outperform our automatic ge
 
 Nevertheless this does not render our solution less valuable: Problem specific optimizations may exists, but usually it is hard do uncover and exploit them. In practice, the effort to come up with an optimal solution is not worth all the effort when a "good enough" solution would also fit the use-case. Furthermore, the maintainability of a short and simple, declarative piece of code is much higher than the optimized version, that exploits subtle properties of the problem, the database-system or uses other nifty tweaks.
 
+
+Static analysis is flexible, limitations sound hard, but are not so bad. Generalization to other conditionals is easy possible, implementation is well structured in phases and easy expandable.
+
+The translation is many magnitudes faster than the original naive recursive function. The original fib-function can be called with max fib(23), while the translation handles still fib(100) within ca. 300ms on the same machine. Problem specific optimized solutions still always wins.
+
+
 %Exmaple: threaded binary tree for iterative tree traversal to keep stack size manageable => smart, but hard to find!
 \section*{Acknowledgements}
 Thanks to Chris, Denis, Grust, proofreader, ...

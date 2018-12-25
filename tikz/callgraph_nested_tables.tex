@@ -1,0 +1,31 @@
+\bgroup
+\def\arraystretch{1.5}
+\begin{tabular}{|c|}\hline
+%\footnotesize\mintinline{postgresql}{in_args := $1 / SELECT c.call_args FROM callstack c}\\
+\begin{tabular}{|l|}\hline
+    \footnotesize{Scenario 1}\\
+    \begin{tabular}{|l|}\hline
+        \footnotesize{Callsite 1}\\
+        \footnotesize\mintinline{postgresql}{SELECT in_args, callsite.id, callsite.args AS call_args}\\[-5pt]
+        \footnotesize\mintinline{postgresql}{  FROM scenario.pred p WHERE p.v}\\
+    \hline \end{tabular}\\
+    \mintinline{postgresql}{UNION}\\
+    \begin{tabular}{|l|}\hline
+        \footnotesize{Callsite 2}\\
+        \footnotesize\mintinline{postgresql}{SELECT in_args, callsite.id, callsite.args AS call_args}\\[-5pt]
+        \footnotesize\mintinline{postgresql}{  FROM scenario.pred p WHERE p.v}\\
+    \hline \end{tabular}\\[2mm]
+\hline \end{tabular}\\
+    \mintinline{postgresql}{UNION}\\
+\begin{tabular}{|l|}\hline
+    \footnotesize{Scenario 2}\\
+    \begin{tabular}{|l|}\hline
+        \footnotesize{Callsite 3}\\
+        \footnotesize\mintinline{postgresql}{SELECT in_args, callsite.id, callsite.args AS call_args}\\[-5pt]
+        \footnotesize\mintinline{postgresql}{  FROM scenario.pred p WHERE p.v}\\
+    \hline \end{tabular}\\[2mm]
+\hline \end{tabular}
+\\[6mm]
+\hline
+\end{tabular}
+\egroup

@@ -1,0 +1,128 @@
+\newsavebox{\discoveryA}
+\sbox{\discoveryA}{
+    \bgroup
+    \def\arraystretch{1.5}
+    \begin{tabular}{|c|}\hline
+        \texttt{in\_args := \$1}\\
+        \begin{tabular}{|l|}\hline
+            \footnotesize{Scenario 1}\\
+            \begin{tabular}{|l|}\hline
+                \footnotesize{Args of callsite 1}\\
+            \hline \end{tabular}\\
+            \begin{tabular}{|l|}\hline
+                \footnotesize{Args of callsite 2}\\
+            \hline \end{tabular}\\[2mm]
+        \hline \end{tabular}\\
+        \begin{tabular}{|l|}\hline
+            \footnotesize{Scenario 2}\\
+            \begin{tabular}{|l|}\hline
+                \footnotesize{Args of callsite 3}\\
+            \hline \end{tabular}\\[2mm]
+        \hline \end{tabular}
+        \\[6mm]
+    \hline
+    \end{tabular}
+    \egroup
+  }
+
+\newsavebox{\discoveryB}
+\sbox{\discoveryB}{
+    \bgroup
+    \def\arraystretch{1.5}
+    \begin{tabular}{|c|}\hline
+        \texttt{in\_args := \{3, 2\}}\\
+        \begin{tabular}{|l|}\hline
+            \footnotesize{Scenario 1}\\
+            \begin{tabular}{|l|}\hline
+                \footnotesize{Args of callsite 1}\\
+            \hline \end{tabular}\\
+            \begin{tabular}{|l|}\hline
+                \footnotesize{Args of callsite 2}\\
+            \hline \end{tabular}\\[2mm]
+        \hline \end{tabular}\\
+        \begin{tabular}{|l|}\hline
+            \footnotesize{Scenario 2}\\
+            \begin{tabular}{|l|}\hline
+                \footnotesize{Args of callsite 3}\\
+            \hline \end{tabular}\\[2mm]
+        \hline \end{tabular}
+        \\[6mm]
+    \hline
+    \end{tabular}
+    \egroup
+  }
+
+\newsavebox{\discoveryC}
+\sbox{\discoveryC}{
+    \bgroup
+    \def\arraystretch{1.5}
+    \begin{tabular}{|c|}\hline
+        \texttt{in\_args := \{2, 1, 0\}}\\
+        \begin{tabular}{|l|}\hline
+            \footnotesize{Scenario 1}\\
+            \begin{tabular}{|l|}\hline
+                \footnotesize{Args of callsite 1}\\
+            \hline \end{tabular}\\
+            \begin{tabular}{|l|}\hline
+                \footnotesize{Args of callsite 2}\\
+            \hline \end{tabular}\\[2mm]
+        \hline \end{tabular}\\
+        \begin{tabular}{|l|}\hline
+            \footnotesize{Scenario 2}\\
+            \begin{tabular}{|l|}\hline
+                \footnotesize{Args of callsite 3}\\
+            \hline \end{tabular}\\[2mm]
+        \hline \end{tabular}
+        \\[6mm]
+    \hline
+    \end{tabular}
+    \egroup
+  }
+  
+\newsavebox{\discoveryRes}
+\sbox{\discoveryRes}{\footnotesize
+\begin{tabular}{c|c|c}
+\texttt{in\_1} & \texttt{callsite\_id} & \texttt{out\_1} \\
+\hline
+\hline
+\texttt{\textcolor{red}{4}} & \texttt{1} & \texttt{3}\\
+\texttt{\textcolor{red}{4}} & \texttt{2} & \texttt{2}\\
+\hline
+\end{tabular}
+}
+\newsavebox{\discoveryResTwo}
+\sbox{\discoveryResTwo}{\footnotesize
+\begin{tabular}{c|c|c}
+\texttt{in\_1} & \texttt{callsite\_id} & \texttt{out\_1} \\
+\hline
+\hline
+\texttt{3} & \texttt{2} & \texttt{2}\\
+\texttt{3} & \texttt{3} & \texttt{1}\\
+\texttt{2} & \texttt{2} & \texttt{1}\\
+\texttt{2} & \texttt{3} & \texttt{0}\\
+\hline
+\end{tabular}
+}
+\newsavebox{\discoveryResThree}
+\sbox{\discoveryResThree}{\footnotesize
+\begin{tabular}{c|c|c}
+\texttt{in\_1} & \texttt{callsite\_id} & \texttt{out\_1} \\
+\hline
+\hline
+\texttt{1} & \texttt{1} & \texttt{0}\\
+\hline
+\end{tabular}
+}
+\begin{tikzpicture}
+\node (discoveryBase) at (0,4) {\usebox{\discoveryA}};\\
+\node (discoveryRec) at (5,4) {\usebox{\discoveryB}};\\
+\node (discoveryRec2) at (10,4) {\usebox{\discoveryC}};\\
+\node (res) at (0, 0) {\usebox{\discoveryRes}};\\
+\node (res2) at (5, 0) {\usebox{\discoveryResTwo}};\\
+\node (res3) at (10, 0) {\usebox{\discoveryResThree}};\\
+\draw[->, bend left=10] (discoveryBase) edge (res);
+\draw[->, bend left=10] (res) edge (discoveryRec);
+\draw[->, bend left=10] (res2) edge (discoveryRec2);
+\draw[->, bend left=10] (discoveryRec) edge (res2);
+\draw[->, bend left=10] (discoveryRec2) edge (res3);
+\end{tikzpicture}
