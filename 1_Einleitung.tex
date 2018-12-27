@@ -11,17 +11,17 @@
 %    What is the problem?
 %    Why is it interesting and important?
 
-\paragraph*{Motivation} Recursion is concise and easy to understand and write, since it resembles our inductive way of thinking about recursive tasks. We start from a nonrecursive basecase and then construct the recursive cases. Evaluation happens by stacking up recursive calls until the first basecase is reached and the result starts to assemble.
+\paragraph*{Motivation} Recursion is concise and easy to understand and write, since it resembles our inductive way of thinking about recursive tasks. We start from a nonrecursive basecase and then construct the recursive cases. Evaluation happens by stacking up recursive calls until basecases are reached and first result can be assemble from them.
 
-The problem with recursion in general is, that each recursive call adds a layer on the callstack of the operating system. Adding a new layer on the callstack is incredibly expensive in terms of time and memory. All variables, returning addresses etc. need to be copied to the stack when switching the context, and restored when popping the layer. For SQL, recursive procedures are especially expensive because the UDF-body of every call is planned and the plan needs to be saved until the cal returns. Therefore, recursive procedures in SQL are very slow and the stack size is quickly exceeded.
+The problem with recursion in general is that it comes with a large overhead. Each call that waits on the result of other function calls is "paused" and the state of execution is pushed to the callstack. This is very expensive in terms of time and memory. All variables, returning addresses etc. need to be copied to the stack when switching the context, and restored when popping the layer. For SQL-UDFs, each call comes with especially large overhead because the UDF-body of every function is planned and the plan needs to be saved until the call returns. Therefore, recursive procedures in SQL are very slow and the limited stack size is quickly exceeded.
 
 %    Why is it hard? (E.g., why do naive approaches fail?)
-Iterative solutions with dynamic programming are usually the way to go where recursion is impractical. By iterartivly manipulating a fixed amount of memory, the memory consumption is limited and expensive context switches are avoided. Translating a declarative but inefficient algorithm into an imperative language like Java and implementing dynamic programming can be challenging. If you can exploit specific mathematical properties of the problem to constraint the search space, you may come up with a very performant solution. But this is a time consuming task and developer time is always a very limited resource.
+Iterative solutions with dynamic programming are usually the way to go where recursion is impractical. By iteratively manipulating variables inside the heap memory, much overhead from the recursion can be avoided. Additionally, computation is not restricted by stack depth (megabytes) but by heap sizes (gigbytes). Dynamic Programming aims to avoid redundant recursive calls by saving results of subproblems in a table. Translating a declarative but inefficient algorithm into an imperative language like Java and implementing dynamic programming can be challenging. If you can exploit specific mathematical properties of the problem to constraint the search space, you may come up with a very efficient solution. But this is a time consuming task and developer time is always a very limited resource.
 
 If your target language is not an imperative language but a declarative SQL-query, implementation is less straight forward. You will additionally need a decent amount of knowledge of SQL, the query planner and probably other internals of the database system to avoid all the pitfalls that can slow down your query. Additionally, you sacrifice much readability for performance, obfuscating the logical level with implementation details. This makes the query less maintainable and more error prone.
 
 %    Why hasn't it been solved before? (Or, what's wrong with previous proposed solutions? How does mine differ?)
-Our approach fully automatizes the optimization process so that the programmer can keep maintaining a truly declarative UDF in a functional style without concerns of performance. The recursive UDF is automatically translated into an optimized formulation. The translation is based on slicing the original function into its different evaluation scenarios. The callsite-arguments of the current scenario are evaluated independently from the surrounding context, creating the callgraph. The callgraph is then level-wise evaluated.
+Our approach fully automatizes the optimization process so that the programmer can keep maintaining a truly declarative UDF in a functional style without concerns of performance. The recursive UDF is automatically translated into an optimized formulation implementing Memoization. The translation is based on slicing the original function into its different evaluation scenarios. The callsite-arguments of the current scenario are evaluated independently from the surrounding context, creating the callgraph. The callgraph is then level-wise evaluated.
 
 \paragraph*{Example}
 
@@ -49,12 +49,13 @@ What happens if we call \mintinline{postgresql}{SELECT fib(4)}? The planner take
     \begin{minipage}[b]{.45\linewidth}
     \centering\large
     \sqlcode{snippets/fib_wide.sql}
-    \subcaption{SQL UDF returning the nth Fibonacci number}
     \vspace{8mm}
+    \subcaption{SQL UDF returning the nth Fibonacci number}
     \label{intro_fib}
     \end{minipage}\hfill
     \begin{minipage}[b]{.45\linewidth}
     \centering\small
+    \vspace{-8mm}
         \begin{align*}
    \Big(&\big\{&\big\langle~&\text{pred}:     &\mintinline{postgresql}{SELECT ($1 = 0)}                  &\\
         &      &    ,~      &\text{query}:    &\mintinline{postgresql}{SELECT 0}                          & \big\rangle \big\}\\
@@ -64,7 +65,7 @@ What happens if we call \mintinline{postgresql}{SELECT fib(4)}? The planner take
         &      &\big\langle~&\text{pred}:     &\mintinline{postgresql}{SELECT (NOT $1 = 0) AND (NOT $1 = 1)}&\\
         &      &    ,~      &\text{query}:    &\mintinline{postgresql}{SELECT fib($1 - 1) + fib($1 - 2)}&\\
         &      &    ,~      &\text{callsites}:&\langle \text{id}: 2,~\text{args}: (\mintinline{postgresql}{SELECT $1 - 1})\rangle &,\\
-        &      &            &                 &\langle \text{id}: 3,~\text{args}: (\mintinline{postgresql}{SELECT $1 - 2})\rangle & \big\rangle\big\} \Big)\\
+        &      &            &                 &\langle \text{id}: 3,~\text{args}: (\mintinline{postgresql}{SELECT $1 - 2})\rangle & \big\rangle\big\} \Big)
         \end{align*}
     \subcaption{Recursive scenarios}\label{fib_rec_scenarios}
     \end{minipage}
@@ -79,7 +80,7 @@ What happens if we call \mintinline{postgresql}{SELECT fib(4)}? The planner take
 \end{wrapfigure}
 
 % Callgraph creation
-The idea behind the translation is to simulate this two phases: top-down callstack-growth and bottom-up evaluation. The callstack is created by evaluating only the parts of the UDF that are necessary to observe subsequent recursive calls. First, this are the predicates of the \texttt{CASE}-expression. They are required to detect which callsites are actually called with the given UDF-arguments. Second, the arguments of these callsites need to be evaluated to find out the input-arguments for the subsequent calls. This way, the callgraph is built until all callsites lead to basecases.
+The idea behind the translation is to simulate this two phases: top-down callstack-growth and bottom-up evaluation. The callstack is created by evaluating only the parts of the UDF that are necessary to observe subsequent recursive calls. First, this are the predicates of the \texttt{CASE}-expression. They are required to detect which callsites are actually called with the given UDF-arguments. Second, the arguments of these callsites need to be evaluated to find out the input-arguments for the subsequent calls. This way, the callstack is built until all callsites lead to basecases. By collecting only unique rows, it is actually not a callstack but a \textit{callgraph} that we create as it contains no duplicate calls.
 
 
 
@@ -99,7 +100,7 @@ Evaluation starts from the bottom: The leaves of the the callstack, ie. the base
 
 %By collecting all calls in a table it is also trivial to remove duplicate calls from the callstack before evaluation (figure z), which gives us memoization which speeds up the translation significantly. The callstack table is just a relational representation of the callstack with memoization (Table T).
 
-The translation output is generated by filling out a number of templates. The data to be filled in is an intermediate representation of the input UDF (\autoref{}), which is generated by a syntax driven analysis of the UDF (\autoref{chapter:analysis}). Its main part is the \textit{scenario analysis} which "slices" the UDF into its different evaluation scenarios. Each scenario consists of a predicate and a query that is semantically equivalent to the original function if the predicate is fulfilled. From the different scenarios the intermediate representation is created. Additional, special properties of the UDF (eg. tail recursion) are detected to choose the best template.
+The output function is generated by filling out a query-template. The data to be filled in is an intermediate representation of the input UDF (\autoref{}), which is generated by a syntax driven analysis of the UDF (\autoref{chapter:analysis}). Its main part is the \textit{scenario analysis} which "slices" the UDF into its different evaluation scenarios. Each scenario consists of a predicate and a query that is semantically equivalent to the original function if the predicate is fulfilled. From the different scenarios the intermediate representation is created. Additional, special properties of the UDF (eg. tail recursion) are detected to choose the best template.
 
 \iffalse
 \begin{tikzpicture}[->, level distance=15mm, align=center]
@@ -157,9 +158,9 @@ The translation output is generated by filling out a number of templates. The da
 
 % The translation template consists of a discovery-phase and an evaluation-phase. During discovery the callstack is built, collecting all recursive calls down to the nonrecursive basecases. From the discovery-table it is now possible to look up the input arguments that lead to a nonrecursive scenario which can be used to begin the recursive evaluation process. As soon as results for all callsites of a given scenario exist, this scenario can be evaluated. The query continues recursively until the argeter of the original call is found in the evaluation table.
     
-\paragraph*{Contributions} The general translation idea has been developed at the Database Systems Research Group at WSI in Tübingen. My main contribution is a first working implementation of this approach in Haskell, targeting PostgreSQL 10.6. I provide a handy command line tool to perform translations of UDFs from the database or from a SQL-file. A folder of UDFs are an entire database can be batch-translated. The translated function(s) can be renamed and saved to file/folder or persisted in the database. Optimizations can selectively be disabled and verbose analysis can be displayed.
+\paragraph*{Contributions} The general translation idea has been developed at the Database Systems Research Group at WSI in Tübingen. My main contribution is a first working implementation of this approach in Haskell, targeting PostgreSQL 10.6. I provide a handy command line tool \texttt{twr} to perform translations of UDFs from the database or from a SQL-file. A folder of UDFs or even an entire database can be batch-translated. The translated function(s) can be renamed and saved to file/folder or persisted in the database. Optimizations can selectively be disabled and analysis output can be shown.
 
-Beside a first working implementation, I contributed some improvements to the inference rules to slice the original UDF into its evaluation scenarios. Here, my main contribution is the addition of rules to handle CTEs that may be nested and can contain callsites. Further, I have rewritten the rules for handling case-expressions to work in a branch-wise fashion. This allows recursive predicates that contains nested \texttt{CASE}-expressions. The stepwise operation also made implementation easier. I added also a set of simple rules to extract the arguments from callsite while keeping references to used CTEs.
+Beside a first working implementation, I contributed some improvements to the inference rules to slice the original UDF into its evaluation scenarios. Here, my main contribution is the addition of rules to handle CTEs that may be nested and can contain callsites. Further, I have rewritten the rules for handling case-expressions to work in a step-wise fashion. This allows recursive predicates that contains nested \texttt{CASE}-expressions. The step-wise operation also made implementation easier. I added also a set of simple rules to extract the arguments from callsite while keeping references to used CTEs.
 
 I also contributed a number of improvements to the templates. Most notably, I have rewritten the template for evaluating recursive scenarios that removes array aggregation and thereby allows arbitrary array arguments\footnote{When aggregating arrays, \texttt{array\_agg} requires all arrays to have the same dimensionality. This renders non-constant array arguments impossible.}. Furthermore, I simplified result selection and non-termination by adding the original call to the callgraph. The pattern to stop evaluation of the recursive CTE when no new results are created while adding old results to the result was also created by me.
 

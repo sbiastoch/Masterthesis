@@ -664,7 +664,7 @@ Recursive predicates cannot be evaluated during callgraph creation and are there
     \label{fig:my_label}
 \end{figure}
 
-This introduces a important constraint: No more callsites after a recursive predicate. The template for the callgraph creation makes the assumption that all callsites in a scenario must be evaluated. If the evaluation of one callsite depends on the evaluation of an other, a finally not evaluated callsite may be evaluated anyway. This can cause nontermination or runtime errors.
+This introduces a important constraint: No more callsites after a recursive predicate. The template for the callgraph creation makes the assumption that all callsites in a scenario will be evaluated. If the evaluation of one callsite is guarded by the evaluation of an other, both callsite are evaluated if they occur in the same scenario. This can cause nontermination or runtime errors.
 
 \subsection{Nonrecursive subtrees}
 Subtrees with no callsite are taken as one big basecase. There is no need to do any further analysis because there are no more callsites that need to be seperated into their evaluation scenarios so that the callgraph can be built. In this case, the \RBASE-rule just adds the entire remaining \texttt{CASE}-expression to $B$.
@@ -1200,12 +1200,71 @@ Either the callsite is directly contained in $e$, or it has a free table-variabl
 %Each CTE-scenario is augmented with its dependencies to previously defined CTEs. Each CTE is sliced into its different scenarios, then each scenario is analyzed, removed from the query and stored in the queue. When all CTEs are processed and the actual query is translated, only those CTEs are reattached to the query-scenario that are actually used. Indirect callsites can be detected by simply checking if there exists a free table-variable that is enlisted in $T$.
 
 \subsection{Tracking CTE-dependencies}\label{tracking_cte_dependencies}
-As we have seen, CTEs may use other CTEs so that we need to keep track of the CTE dependencies of a query. This happens similar to the creation of the set $T$ of recursive CTEs. For each CTE \texttt{C} we collect all CTE-references \texttt{$C_i$} and add them to the set of dependencies $D_c$. Because the used CTEs may have again dependencies, they are also added to $D_c$.
+As we have seen, CTEs may use other CTEs so that we need to keep track of the CTE dependencies of a scenario. This happens similar to the creation of the set $T$ of recursive CTEs. For each CTE \texttt{C} we collect all CTE-references \texttt{$C_i$} and add them to the set of dependencies $D_c$. Because the used CTEs may have again dependencies, they are also added to $D_c$. 
 
-$$\refs(q) := \FV(q) \cup \left(\bigcup_{c \in \FV(q)} \refs(c)\right)$$
+Tracking dependencies for scenario-queries is different from tracking dependencies for scenario-predicates. For scenario-queries it is sufficient to track references to CTEs. Tracking dependencies for predicates requires to include both, dependencies to CTEs and dependencies from 
+
+A scenario can have dependencies from both of its components: From the query and from the predicate. To track dependencies for scenario-queries it is sufficient to consider only other CTEs and dependencies within their scenario-query. For predicates additionally dependencies from other predicates must be included: Predicates can reference CTEs with predicates that reference CTEs and so on. 
+
+$$\refs_p(C, q) := \FV(q) \cup \left(\bigcup_{(\_, \_, \_, rs_t, rs_p) \in C[\FV(q)]} rs_t \cup rs_p \right)$$
+$$\refs_q(C, q) := \FV(q) \cup \left(\bigcup_{(\_, \_, \_, \_, rs_p) \in C[\FV(q)]} rs_t \right)$$
 
 Because of the ordering of CTEs we can do this while processing each CTE one by one. See \autoref{fig:cte_deps} for an illustration of how dependencies to other CTEs are tracked.
 
+\begin{figure}[h!]
+    \centering
+    \begin{tikzpicture}[x=10mm, y=15mm, node distance=1cm]
+    \tikzset{Box/.style={shape=rectangle, draw, minimum width=1cm, minimum height=0.5cm, inner sep=2mm}}
+    \node[anchor=west] at (-2.5, 1) {\WITH};
+    
+    \node[Box] (p0) at (0, 1)  {$p_0$};
+    \node[Box, right of=p0] (q0) {$q_0$};
+    \node at (3, 1) {$\emptyset$};
+    \node at (5, 1) {$\emptyset$};
+    
+    \node[Box] (p1) at (0, 0)  {$p_1$};
+    \node[Box, right of=p1] (q1) {$q_1$};
+    \node at (3, 0) {$\emptyset$};
+    \node at (5, 0) {$\{0\}$};
+    
+    \node[Box] (p2) at (0, -1)  {$p_2$};
+    \node[Box, right of=p2] (q2) {$q_2$};
+    \node at (3, -1) {$\{0, 1\}$};
+    \node at (5, -1) {$\emptyset$};
+    
+    \node[Box] (p3) at (0, -2)  {$p_3$};
+    \node[Box, right of=p3] (q3) {$q_3$};
+    \node at (3, -2) {$\{0, 1, 2\}$};
+    \node at (5, -2) {$\emptyset$};
+    
+    \node[Box] (p4) at (0, -3)  {$p_4$};
+    \node[Box, right of=p4] (q4) {$q_4$};
+    \node at (3, -3) {$\emptyset$};
+    \node at (5, -3) {$\{3\}$};
+    
+    \node[Box] (p5) at (0, -4)  {$p_5$};
+    \node[Box, right of=p5] (q5) {$q_5$};
+    \node at (3, -4) {$\{3, 4\}$};
+    \node at (5, -4) {$\{0, 1\}$};
+    
+    \node[Box, minimum width=2cm] (p) at (-1.5, -5){$p$};
+    \node[Box, minimum width=2cm] (q) at (0.5, -5) {$q$};
+    \node at (3, -5) {$\{0, 1, 2, 3\}$};
+    \node at (5, -5) {$\{0, 1, 5\}$};
+    
+    \draw[->] (q1.north) to (q0.south);
+    \draw[->] (p2.north) to (q1.south);
+    \draw[->] (p5.north) to (q4.south);
+    \draw[->] (p3.north) to (q2.south);
+    \draw[->] (q4.north) to (q3.south);
+    \draw[->, bend left=40, in=140] (p.north) to (q3.south);
+    \draw[->] (p5.north) to (q4.south);
+    \draw[->, bend right=15] (q5.north east) to (q1.south east);
+    \draw[->] (q.north) to (q5.south);
+    \end{tikzpicture}
+    \caption{References are tracked incrementally by collecting free table-variables (ie. direct CTE references) along with the references of those free table-variables. Note that the use of $\refs$ here varies from its definition to illustrate the process more clearly.}
+    \label{fig:cte_deps}
+\end{figure}
 \begin{figure}[h!]
     \centering
     \begin{tikzpicture}[x=10mm, y=10mm]
@@ -1216,13 +1275,13 @@ Because of the ordering of CTEs we can do this while processing each CTE one by 
     \node[anchor=west] (D) at (0, -3) {\texttt{D} \AS $(d)$};
     \node[anchor=west] (Ar) at (3, 0)  {$\refs(a) = \FV(a) \cup \emptyset = \emptyset$};
     \node[anchor=west] (Br) at (3, -1) {$\refs(b) = \FV(b) \cup \emptyset = \emptyset$};
-    \node[anchor=west] (Cr) at (3, -2) {$\refs(c) = \FV(c) \cup (\refs(a) \cup \refs(b)) = \{\texttt{A}, \texttt{B}\}$};
-    \node[anchor=west] (Dr) at (3, -3) {$\refs(d) = \FV(d) \cup (\refs(c)) = \{\texttt{A}, \texttt{B}, \texttt{C}\}$};
+    \node[anchor=west] (Cr) at (3, -2) {$\refs(c) = \FV(c) \cup (\refs(a) \cup \refs(b)) = \{\texttt{B}, \texttt{A}\} \cup \emptyset$};
+    \node[anchor=west] (Dr) at (3, -3) {$\refs(d) = \FV(d) \cup (\refs(c)) = \{\texttt{C}\} \cup \{\texttt{B}, \texttt{A}\}$};
     \draw[->, bend right=60] (C) to (A);
     \draw[->] (C) to (B);
     \draw[->] (D) to (C);
     \end{tikzpicture}
-    \caption{References are tracked incrementally by collecting free table-variables (ie. direct CTE references) along with the references of those free table-variables.}
+    \caption{References are tracked incrementally by collecting free table-variables (ie. direct CTE references) along with the references of those free table-variables. Note that the use of $\refs$ here varies from its definition to illustrate the process more clearly.}
     \label{fig:cte_deps}
 \end{figure}
 
@@ -1232,24 +1291,24 @@ While shadowing was an issue when tracking recursive CTEs, it does not hit us he
     \centering
     \begin{tikzpicture}
     \node (cte) at (4, 1) {\texttt{WITH C} \AS $\highlight[red!15]{c}~ \underbrace{\texttt{SELECT * FROM C}}_e$};
-    \node (cte1) at (0, -1) {
+    \node (cte1) at (0, -1) {\footnotesize
         \begin{tabular}{|p{1em}|r|c|}\hline
         \cellcolor{gray!25} $\ast$ & $p_1$ & $\highlight[red!15]{c'_1}$\\\hline
         \end{tabular}
     };
-    \node (cte2) at (8, -1) {
+    \node (cte2) at (8, -1) {\footnotesize
         \begin{tabular}{|p{1em}|r|c|}\hline
         \cellcolor{gray!25} & $p_2$ & $\highlight[red!15]{c'_2}$\\\hline
         \end{tabular}
     };
     \node (select1) at (0, -3) {\texttt{SELECT ... FROM C ...}};
     \node (select2) at (8, -3) {\texttt{SELECT ... FROM C ...}};
-    \node (r1) at (0, -5) {
+    \node (r1) at (0, -5) {\footnotesize
         \begin{tabular}{|p{1em}|r|c|}\hline
         \cellcolor{gray!25} $\ast$ & $p_1 \land \hdots$ & $\highlight[red!15]{\texttt{WITH C AS } ~\highlight[red!35]{c'_1}}~\highlight[green!15]{\SELECT~*~\texttt{FROM C}}$\\\hline
         \end{tabular}
     };
-    \node (r2) at (8, -5) {
+    \node (r2) at (8, -5) {\footnotesize
         \begin{tabular}{|p{1em}|r|c|}\hline
         \cellcolor{gray!25} & $p_2 \land \hdots$ & $\highlight[red!15]{\texttt{WITH C AS } ~\highlight[red!35]{c'_2}}~\highlight[green!15]{\SELECT~*~\texttt{FROM C}}$\\\hline
         \end{tabular}
@@ -1325,8 +1384,8 @@ added to the CTE-store $C$ and the set $T$ of recursive table-variables is updat
 $$\quad(\textsc{cte})\inferrule{
     \hasCallsite(T, \WITH~ a_1 \AS t_1, ..., a_n \AS t_n~q)\\\\
     T, \varnothing \vdash (p, t_1) \rightarrow (B, R) \\
-    \forall (p'_t, t') \in B: T \setminus \{a_1\}, C[a_1: (t', p'_t, \refs(t')] \vdash (p, \WITH~ a_2 \AS t_2, ..., a_n \AS t_n~q) \rightarrow (B_i, R_i) \\
-    \forall (p'_t, t') \in R: T \cup \{a_1\}, C[a_1: (t', p'_t, \refs(t')] \vdash (p, \WITH~ a_2 \AS t_2, ..., a_n \AS t_n~q) \rightarrow (B_j, R_j)
+    \forall (p'_t, t') \in B: T \setminus \{a_1\}, C[a_1: (t', p'_t, \refs(C, t'), \refs(C, p'_t)] \vdash (p, \WITH~ a_2 \AS t_2, ..., a_n \AS t_n~q) \rightarrow (B_i, R_i) \\
+    \forall (p'_t, t') \in R: T \cup \{a_1\}, C[a_1: (t', p'_t, \refs(C, t'), \refs(C, p'_t)] \vdash (p, \WITH~ a_2 \AS t_2, ..., a_n \AS t_n~q) \rightarrow (B_j, R_j)
 }{
 {\begin{tabular}{L}
     T, C \vdash (p, \WITH~ a_1 \AS t_1, ..., a_n \AS t_n~q) \rightarrow \\
@@ -1351,10 +1410,11 @@ $$\quad(\textsc{cte})\inferrule{
 \sqlcode{snippets/from_shadowing.sql}
 
 \subsection{\RWITH-rule: Attaching used CTEs only}
-When all CTEs of a query are removed, the actual query is analyzed. The query contains none of the preceeding CTEs anymore, so that it is sufficient to analyze the current subtree together with the set $T$ of recursive CTEs in scope to decide whether a subtree is recursive.
+When all CTEs have been analyzed and moved the CTE-store $C$, the actual query is analyzed. Additionally, the required CTEs are reattached.
 
-CTEs that are referenced by the given scenario of the actual query $C[\refs(q')]$ need to be reattached. Along with the CTEs, their predicates are attached to the scenario-predicate. Predicates in turn can reference CTEs as well, so CTE used by the query- and CTE-predicates are prepended to the predicate of the query. $preds=\refs(???)$ 
+This happens in three steps, nearly identical for recursive and nonrecursive scenarios of \texttt{q}. 1) The actual query is analyzed, resulting in nonrecursive scenarios $B$ resp. $R$. 2) For the given scenario, the CTEs referenced by the query $q'$ are looked up from ($C[\refs_q(q')]$) and prepended to the resulting scenario-query. 3) All CTEs, referenced either by scenario-queries or scenario-predicates, are retrieved ($C[\refs_q(q') \cup \refs_p(p')]$) and their predicates ($p_1, ..., p_k$) are added to the resulting scenario-predicate. 4) As each predicate may include again references to CTEs, these references $dp_1, \dots,  dp_k$ are used to retrieve the CTE required to evaluate the scenario-predicate ($C[dp_1 \cup \dots \cup dp_k]$).
 
+%Unused CTEs from predicates do no harm, because they are always nonrecursive. Unused recursive CTEs in predicates do no harm as well as predicate are not checked wheter recursive.
 
 \makebox[\textwidth][c]{$$\inferrule{
     C \neq \varnothing\\
@@ -1362,14 +1422,15 @@ CTEs that are referenced by the given scenario of the actual query $C[\refs(q')]
 }{
     T, C \vdash (p, \WITH~ q) \rightarrow \\\\
     {\begin{tabular}[b]{LLLL}
-    \Big(~~&\big\{&(&\WITH~ a_1 \AS t_1, \dots, a_m \AS t_m~\SELECT~ p_1 ~\AND~ \dots ~\AND~ p_n, \\
+    \Big(~~&\big\{&(&\WITH~ a_1 \AS t_1, \dots, a_n \AS t_n~\SELECT~ p_q ~\AND~p_1 ~\AND~ \dots ~\AND~ p_n, \\
           &&&\WITH~ a_1 \AS t_1, \dots, a_n \AS t_n~~q'~\\
-          &&| &~(p_q, q') \in B,~~~~~~~~~~~~~~~~~C[\refs(q')] ~~~~~~~~= \langle (a_1, t_1, p_1, \_), \dots, (a_n, t_n, p_n, \_) \rangle,\\
-          &&  &~P=\{p_q\} \cup \{p_1, \dots, p_n\},~ C[\cup_{p' \in P} \refs(p')] = \langle (a_1, t_1, p_1, \_), \dots, (a_m, t_m, p_m, \_) \rangle \big\}\\[3mm]
-    &\big\{&(&\WITH~ a_1 \AS t_1, \dots, a_m \AS t_m~\SELECT~ p_1 ~\AND~ \dots ~\AND~ p_n, \\
+          &&| &~(p_q, q') \in B, C[\refs(C, q') \cup \refs(C, p')] = \langle (a_1, t_1, p_1, \_), \dots, (a_n, t_n, p_n, \_) \rangle \big\}\\[3mm]
+    &\big\{&(&\WITH~ a_1 \AS t_1, \dots, a_m \AS t_m~\SELECT~ p_q ~\AND~p_1 ~\AND~ \dots ~\AND~ p_k, \\
           &&&\WITH~ a_1 \AS t_1, \dots, a_n \AS t_n~~q'~\\
-          &&| &~(p_q, q') \in R,~~~~~~~~~~~~~~~~~C[\refs(q')] ~~~~~~~~= \langle (a_1, t_1, p_1, \_), \dots, (a_n, t_n, p_n, \_) \rangle,\\
-          &&  &~P=\{p_q\} \cup \{p_1, \dots, p_n\},~ C[\cup_{p' \in P} \refs(p')] = \langle (a_1, t_1, p_1, \_), \dots, (a_m, t_m, p_m, \_) \rangle \big\}\Big)\\
+          &&| &~(p_q, q') \in R,\\
+          &&  &~C[\refs_q(C, q')] ~~~~~~~~~~~~~~~~~= \langle (a_1, t_1, \_, \_, \_), \dots, (a_n, t_n, \_, \_, \_) \rangle,\\
+          &&  &~C[\refs_p(C, p') \cup \refs_p(C, q')] = \langle (a_1, t_1, \_, \_, \_), \dots, (a_m, t_m, \_, \_, \_) \rangle,\\
+          &&  &~C[\refs_p(C, p') \cup \refs_q(C, q')] = \langle (\_, \_, p_1, \_, \_), \dots, (\_, \_, p_k, \_, \_) \rangle \big\}\Big)\\
     \end{tabular}}
 }\quad(\textsc{with})$$}
 \\
@@ -1390,6 +1451,9 @@ CTEs that are referenced by the given scenario of the actual query $C[\refs(q')]
 }\quad(\textsc{with})$$}
 \\
 \fi
+
+Additionally, we need an other axiom to add a table-reference to the set of recursive scenarios if it references a recursive CTE.
+
 % REF
 $$\quad(\textsc{ref})\inferrule{
    \text{isReference}(S) \\
