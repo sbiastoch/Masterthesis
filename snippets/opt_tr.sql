@@ -10,5 +10,5 @@ WITH RECURSIVE
 SELECT
   COALESCE(
     (SELECT b.result FROM basecases b),
-    (SELECT DISTINCT NULL::NUMERIC FROM loop)
+    (SELECT DISTINCT NULL::<return type> FROM loop)
   )

@@ -6,7 +6,8 @@
 %%% allgemeine Einstellungen
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-\documentclass[twoside,10pt,a4paper]{report}
+\documentclass[oneside,12pt,a4paper]{report}
+\usepackage{geometry}
 \usepackage[utf8]{inputenc}
 \usepackage[T1]{fontenc}
 
@@ -24,7 +25,6 @@
 \usepackage{csquotes}
 \usepackage{amsmath}
 \usepackage{subcaption}
-\usepackage{geometry}
 \usepackage{mathpartir}
 \usepackage{listings}
 \usepackage{mathtools}
@@ -122,11 +122,13 @@
 
 % Do not make minted full width but only so wide as required
 \RecustomVerbatimEnvironment{Verbatim}{BVerbatim}{}
-\renewcommand{\figurename}{Listing}
 
 \DeclareMathOperator{\FV}{\text{\rm FV}} % set of free variables
-\DeclareMathOperator{\refs}{\ensuremath{\text{refs}}}
+\DeclareMathOperator{\deps}{\ensuremath{\text{deps}}}
 \DeclareMathOperator{\hasCallsite}{\ensuremath{\text{hasCallsite}_{fn}}}
+
+\newcommand{\todo}[1]{}
+\renewcommand{\todo}[1]{{\color{red} TODO: {#1}}}
 
 \newcommand{\WITH}{\ensuremath{\text{\texttt{WITH}}}}
 \newcommand{\AS}{\ensuremath{\text{\texttt{ AS }}}}
@@ -164,8 +166,6 @@
 %\footskip 2cm
 %\parskip0.5explus0.1exminus0.1ex
 
-\providecommand*{\listingautorefname}{Listing}
-
 \pagestyle{headings}
 
 \sloppy
@@ -192,7 +192,7 @@ Wilhelm-Schickard-Institut für Informatik\\[4cm]}
   {\huge Master's Thesis Computer Science\\[2cm]}
   {\Large\bf Translating Recursive Functions to Declarative PostgreSQL User-Defined Functions\\[1.5cm]}
  {\large Stephan Biastoch}\\[0.5cm]
-2018\\[4cm]
+2018\\[3cm]
 {\small\bf Reviewers}\\[0.5cm]
   \parbox{7cm}{\begin{center}{\large Prof. Dr. Torsten Grust}\\
   {\footnotesize Database Systems Research Group\\ Wilhelm-Schickard-Institut für Informatik\\%

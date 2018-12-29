@@ -1,0 +1,12 @@
+
+    \begin{align*}
+\Big(&\big\{&\big\langle~&\text{pred}:     &\mintinline{postgresql}{SELECT ($1 = 0)}                  &\\
+    &      &    ,~      &\text{query}:    &\mintinline{postgresql}{SELECT 0}                          & \big\rangle \big\}\\
+, ~ &\big\{&\big\langle~&\text{pred}:     &\mintinline{postgresql}{SELECT (NOT $1 = 0) AND ($1 = 1)}&\\
+    &      &    ,~      &\text{query}:    &\mintinline{postgresql}{SELECT 1 + fib(0)}&    \\
+    &      &    ,~      &\text{callsites}:&\langle \text{id}: 1,~\text{args}: (\mintinline{postgresql}{SELECT 0})\big\rangle & \big\rangle\\
+    &      &\big\langle~&\text{pred}:     &\mintinline{postgresql}{SELECT (NOT $1 = 0) AND (NOT $1 = 1)}&\\
+    &      &    ,~      &\text{query}:    &\mintinline{postgresql}{SELECT fib($1 - 1) + fib($1 - 2)}&\\
+    &      &    ,~      &\text{callsites}:&\langle \text{id}: 2,~\text{args}: (\mintinline{postgresql}{SELECT $1 - 1})\rangle &,\\
+    &      &            &                 &\langle \text{id}: 3,~\text{args}: (\mintinline{postgresql}{SELECT $1 - 2})\rangle & \big\rangle\big\} \Big)
+    \end{align*}

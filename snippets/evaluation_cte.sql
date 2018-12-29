@@ -4,8 +4,8 @@ WITH RECRUSIVE
         (TABLE basecases)
         
         UNION ALL (
-            WITH e AS (TABLE evaluation),
-                 new_results AS (
+            WITH e(in_1, res) AS (TABLE evaluation),
+                 new_results(in_1, res) AS (
                      <evaluate recursive scenario(scenario[1])>
                        UNION ALL
                      <evaluate recursive scenario(scenario[2])>

@@ -1,10 +1,18 @@
 \chapter{Query templates}\label{template}
 
-% Evaluation of recursive functions
-The translated functions follow all a common schema in general. First, the callstack-graph is created top-down by evaluating the arguments only of the current evaluation scenario. This happens as long until all calls result in calls to nonrecursive basecases-scenarios. The basecases are then evaluated with the according arguments discovered by the callgraph. Evaluation continues bottom-up as new recursive cases have results of their callsites available.
+The translation is based on the idea of creating queries that reproduce callstack-growth and evaluation. The form of this these queries is always identical, only the expressions that are evaluated at distinct points are dependant on the input UDF. In this chapter I present the templates that are used to create and evaluate the callgraph.
+
+The templates are given in a macro-style where the required data is given as arguments. Filling out the templates involves no analyzing or data extraction, all required information, predicates, scenarios etc. is present in an intermediate representation of the UDF (\autoref{intermed:fib_output}). The generation of the intermediate representation is explained in \autoref{chapter:analysis}.
+
+\begin{figure}[h!]
+    \centering\small
+    \input{snippets/fib_intermediate.tex}
+    \caption{Intermediate representation of \texttt{fib(int)} used as data source for the templates.}
+    \label{intermed:fib_output}
+\end{figure}
 
 % Two phases: Callgraph growth and callstack evaluation
-This two phases, callstack discovery and callstack evaluation, are implemented by two CTEs, \texttt{callstack} and \texttt{evaluation}. The final query selects the desired final output from the evaluation-CTE. \autoref{fig:standard_template_structure} illustrates the very high level idea of the standard translation template.
+There are two main phases, callgraph creation and callgraph evaluation that are implemented as two CTEs, \texttt{callgraph} and \texttt{evaluation}. The final query selects the desired final output from the evaluation-CTE. \autoref{fig:standard_template_structure} illustrates the very high level idea of the standard translation template.
 
 \begin{figure}[h!]
     \centering
@@ -16,20 +24,18 @@ This two phases, callstack discovery and callstack evaluation, are implemented b
 % Special care needs to be taken to behave not only in terms of result values, but also in terms of termination.
 Special care needs to be taken to behave like the original function in terms of termination. Call-loops in the original function lead to an infinite growing callstack, causing nontermination. By using memoization in the translation, this does not happen in our template, so we have to detect that case and manually init nontermination.
 
-In this chapter I will provide a number of "macros" that fill the templates with values. I give these macros with respect to the running example of \texttt{fib}, so for a function with a single attribute. This avoids cluttering difficult spots with excessiv notation. To generalize to more attributes the following things need to be done:
+In this chapter I will provide a number of "template-macros" that fill the templates with values. I give these macros with respect to the running example of \texttt{fib}, so for a function with a single attribute. This avoids cluttering difficult spots with excessive notation. To generalize to more attributes the following things need to be done:
 \begin{itemize}
     \item Instead of a single column \texttt{in\_1} or \texttt{out\_1}, we need further columns \texttt{in\_2, ..., in\_n} and \texttt{out\_2, ..., out\_n}.
-    \item Whenever we match tables by their arguments, eg. \texttt{(c.in\_1) = (e.out\_1)} it is clear that this needs to be altered analogous to \texttt{(c.in\_1, c.in\_2, ..., c.in\_n) = (e.out\_1, e.out\_2, ..., out\_n)}.
-    \item The same applies whenever replacing UDF arguments: \texttt{q[x1/\$1]} needs to become \texttt{q[x1/\$1, x2/\$1, ..., xn/\$n]}.
+    \item Whenever we match tables by their arguments, eg. \texttt{(c.in\_1) = (e.out\_1)} this needs to be altered analogous: \texttt{(c.in\_1, c.in\_2, ..., c.in\_n) = (e.out\_1, e.out\_2, ..., out\_n)}.
+    \item The same applies whenever replacing an UDF argument \texttt{\$1} in \texttt{q} by \texttt{x1}: \texttt{q[x1/\$1]} needs to become \texttt{q[x1/\$1, x2/\$1, ..., xn/\$n]}.
 \end{itemize}
+
 For full examples with more than one argument see the appendix. 
 
 \section{Callgraph discovery}
 
-The idea of the callgraph-CTE is to utilize the generated predicates from the recursive scenarios to detect which callsites in the original query are reached with the arguments of the current invocation.
-Starting with the original arguments of the UDF-invocation the applicable scenario is detected and the contained callsites are discovered. The arguments passed to the newly discovered callsites are evaluated independetly and used to recursively collect subsequent calls.
-
-\subsection{Tabular callgraph representation}
+Starting with the original arguments of the UDF-invocation, the current evaluation scenario is detected and the contained callsites are discovered. The arguments passed to the newly discovered callsites are evaluated independently and used to recursively collect subsequent calls.
 
 \begin{figure}[h!]\small
     \begin{minipage}[b]{.5\linewidth}
@@ -62,11 +68,12 @@ Starting with the original arguments of the UDF-invocation the applicable scenar
     \caption{Callgraph of \texttt{fib(4)} (a) and its tabular representation as generated by the \texttt{callstack}-CTE (b). Each edge represents a callsite.}\label{fig:fib_callstack}
 \end{figure}
 
-The callstack-CTE creates a direct encoding of the callstack graph (\autoref{fig:fib_callstack}). Each row depicts an edge between two nodes, including the label. Nodes of the callgraph correspond to recursive invocations, identified by their arguments, one column per argument. Beside arguments of the caller and callee, the id of the callsite is noted. Callsite ids are used to associate callsites to scenarios.
+The callgraph-CTE creates a direct encoding of the actual callstack-tree but collapses identical nodes into one, resulting in a Directed Acyclic Graph (DAG) if the recursion contains no loops (\autoref{fig:fib_callstack}). Each row depicts an edge between two nodes, including the label. Nodes of the callgraph correspond to recursive calls, identified by their arguments, one column per argument. Beside arguments of the caller and callee, the id of the callsite is noted. Callsite ids are used to associate callsites to scenarios.
 
 \subsection{Collecting callsite arguments}
 
-Thanks to the data from the scenario analysis, the query to add the rows for new callsite can be generated by a simple macro (\autoref{marco:collect_call_maybe}). The predicate acts as guard to add only callsites of the appropriate evaluation scenario. Only if the predicate is fulfilled, any row is returned. The third row in \autoref{fig:fib_callstack_table} is eg. generated by \mintinline{postgresql}{<collect_call_maybe(d.out_1, p1, <callsite id: 2, arg_1: (SELECT $1 - 2)>)>}.
+The callgraph is created by an self-referential CTE. The base query and the self-referential query of the CTE are nearly identical. Each callsite has an own query returning a single row (input arguments, callsite id, callsite arguments) if the predicate of its scenario is fulfilled. The template is given in \autoref{marco:collect_call_maybe}.
+The predicate acts as guard to add only callsites of the current evaluation scenario. Only if the predicate is fulfilled, any row is returned. For example, the query that returned the third row in \autoref{fig:fib_callstack_table} is generated by \mintinline{postgresql}{<collect_call_maybe(d.out_1, p2, <callsite id: 3, arg_1: (SELECT $1 - 2)>)>}.
 
 \begin{figure}[h!]\centering
     \begin{minted}{postgresql}
@@ -78,7 +85,7 @@ Thanks to the data from the scenario analysis, the query to add the rows for new
            FROM predicate AS p(is_true)
            WHERE p.is_true
     \end{minted}
-  \caption{Pseudocode to generate a single call to the callgraph-table. $q[y/x]$ denots the operation of replacing y for x in q. For \texttt{in\_arg\_1} it is used in the beginning \$1 and later references to preceding arguments from the table.}
+  \caption{Pseudocode to generate a single call to the callgraph-table. $q[y/x]$ denots the operation of replacing $y$ for $x$ in $q$. For \texttt{in\_arg\_1} it is used in the beginning \texttt{\$1} and later references to preceding arguments from the table.}
   \label{marco:collect_call_maybe}
 \end{figure}
 
@@ -92,26 +99,26 @@ The macro from \autoref{marco:collect_call_maybe} creates only a query, returnin
              
         -- Scenario 1
         (   -- Callsite 1
-            <collect_call_maybe(in_arg_1, p2, scenarios[2].callsites[1])>   )
+            <collect_call_maybe(in_arg_1, p1, scenarios[1].callsites[1])>   )
         
         UNION
         
         -- Scenario 2
         (   -- Callsite 2
-            <collect_call_maybe(in_arg_1, p1, scenarios[1].callsites[1])>
+            <collect_call_maybe(in_arg_1, p2, scenarios[2].callsites[1])>
           UNION
             -- Callsite 3
-            <collect_call_maybe(in_arg_1, p1, scenarios[1].callsites[2])>   )
+            <collect_call_maybe(in_arg_1, p2, scenarios[2].callsites[2])>   )
 \end{minted}
-  \caption{All callsites of all scenarios needs to be tested to cover the entire function.}
+  \caption{All callsites of all scenarios needs to be tested to cover the entire UDF.}
   \label{macro:collect_calls}
 \end{figure}
 
-With the query generated by \texttt{<collect\_calls(\$1, scenarios)>} all callsites of the initial UDF invocation are obtained. Subsequent levels of the callgraph can be collected recursively by using the \texttt{out\_1}-column from the previous iteration instead of \texttt{\$1}. For each callsite from the previous iteration, the according evaluation scenario needs to be detected to collect new callsites. This for-each behaviour is implemented by \texttt{LATERAL} in the marco for \texttt{callgraph}.
+With the query generated by \texttt{<collect\_calls(\$1, scenarios)>} all callsites of the initial UDF invocation are obtained. Subsequent levels of the callgraph can be collected recursively by using the \texttt{out\_1}-column from the previous iteration instead of \texttt{\$1}. For each callsite from the previous iteration, the according evaluation scenario needs to be detected to collect new callsites. This for-each behaviour is implemented by \texttt{LATERAL} in the template for \texttt{callgraph}.
 
 \begin{figure}[h!]\centering
 \begin{minted}{postgresql}
-<callstack(rec_scenarios)> :=
+<callgraph(rec_scenarios)> :=
   (
     (SELECT NULL, 0, $1) -- add original call
       UNION ALL
@@ -121,7 +128,7 @@ With the query generated by \texttt{<collect\_calls(\$1, scenarios)>} all callsi
     SELECT
       new_calls.*
     FROM
-      callstack AS c, LATERAL (
+      callgraph AS c, LATERAL (
         <collect_calls(c.out_1, rec_scenarios)>
       ) AS new_calls
   )
@@ -140,22 +147,16 @@ With the query generated by \texttt{<collect\_calls(\$1, scenarios)>} all callsi
 \end{figure}
 \fi
 
-\begin{figure}[h]
-\input{tikz/callgraph_iterations.tex}
-    \caption{Callgraph growth of of \texttt{fib(4)}. The last iteration yields just a single row because only new rows are kept.}
-    \label{callstack_recurse}
-\end{figure}
-
 For a complete example of the \texttt{callgraph}-CTE for fib, see \autoref{fib:callstack_cte_complete} in the appendix.
 
-Callgraph growth ends as soon as no recursive scenario is applicable for any newly discovered callsites, ie. all callsites lead to basecases. In this case, the new iteration contains no rows, making \texttt{WITH RECURSIVE} stop.
+Callgraph growth ends as soon as no recursive scenario is applicable for any newly discovered callsites, ie. all callsites lead to basecases. In this case, the new iteration contains no rows, causing \texttt{WITH RECURSIVE} to stop.
 
 \section{Callgraph evaluation}
 % Evaluation starts bottom up at the leaves of the callstack
-Evaluation starts bottom up from the leafs of the callgraph. Scenarios are evaluated by replacing their original arguments with references to the arguments from the callgraph (\autoref{macro:single_basecase}). Scenarios may depend on other scenarios that need to be evaluated first. If all dependencies of a scenario are evaluated, the scenario can be evaluated itself. Nonrecursive scenarios have no dependencies by definition and can be evaluated therefore straight ahead. From this initial rows evaluation continues. Finally, the desired result can be selected.
+Evaluation starts bottom up from the leafs of the callgraph. Scenarios are evaluated by replacing their original arguments with references to the arguments from the callgraph (\autoref{macro:single_basecase}). Scenarios may depend on other scenarios that need to be evaluated first. If all dependencies of a scenario are evaluated, the scenario can be evaluated itself. Nonrecursive scenarios have no dependencies and can be therefore evaluated straight ahead. From this initial rows evaluation continues. Finally, the desired result can be selected.
 
 \begin{figure}[h!]\small
-    \begin{minipage}[b]{.45\linewidth}
+    \begin{minipage}[b]{.45\linewidth}\small
     \centering
 \begin{tikzpicture}
 % nodes
@@ -177,38 +178,24 @@ Evaluation starts bottom up from the leafs of the callgraph. Scenarios are evalu
     \subcaption{}\label{}
     \end{minipage}%
     \hfill
-    \begin{minipage}[b]{.45\linewidth}
+    \begin{minipage}[b]{.45\linewidth}\small
     \centering
-    \begin{tabular}{|c|c|}
-        \texttt{in\_arg\_1} & \texttt{result}\\
-        \hline
-        \hline
-        \texttt{0} & \texttt{0}\\
-        \hline
-        \hline
-        \texttt{1} & \texttt{1}\\
-        \hline
-        \texttt{2} & \texttt{1}\\
-        \hline
-        \texttt{3} & \texttt{2}\\
-        \hline
-        \texttt{4} & \texttt{3}\\
-        \hline
-    \end{tabular}
+    \input{snippets/tbl_evaluation.tex}
     \subcaption{}\label{fig:fib_callstack_cte}
     \end{minipage}
-    \caption{a) Dependency-graph, directly retrieved from the callgraph. Callsite ids are annotated to the edges. Leafs are callsites resulting in basecases. b) \texttt{evaluation}-table that holds results for all evaluated scenarios. The first row is the result of the basecase. Following rows are computed iterativly.}\label{}
+    \caption{a) Dependency-graph, directly retrieved from the callgraph. Callsite ids are annotated to the edges. Sinks are callsites resulting in basecases. b) \texttt{evaluation}-table that holds results for all evaluated scenarios. The first row is the result of the basecase. Following rows are computed iterativly.}\label{}
+    \vspace*{-1cm}
 \end{figure}
 
-\subsection{Evaluating nonrecursive scenarios}
+\subsection{Evaluating basecases}
 Arguments for the evaluation of nonrecursive scenarios can be found in the leafs of the callgraph.
-Evaluation of a single scenario is rather simple. UDF-arguments like \texttt{\$1} are replaced by references to arguments from the callgraph. The predicate from the generated scenario is evaluated in the \texttt{WHERE}-clause and prevents evaluation of wrong scenarios. \autoref{macro:single_basecase} shows a macro for evaluating a single scenario. Each scenario corresponds to a single query returning one or no rows. To collect all scenarios the union of this queries is built.
+Evaluation of a single scenario is rather simple. UDF-arguments like \texttt{\$1} are replaced by references to arguments (\texttt{out\_1}) from the callgraph. The predicate from the generated scenario is evaluated in the \texttt{WHERE}-clause and prevents evaluation of wrong scenarios. \autoref{macro:single_basecase} shows a macro for evaluating a single scenario. Each scenario corresponds to a single query returning one or no rows. To collect all scenarios the union of this queries is built.
 \begin{figure}[h!]
     \centering
     \begin{minted}{postgresql}
 <evaluate nonrecursive scenario(scenario)>
- := SELECT c.out_1                    AS in_1, 
-           scenario.query[c.out_1/$1] AS result
+ := SELECT c.out_1                               AS in_1, 
+           scenario.query[c.out_1/$1]::<argtype> AS result
     FROM calls_to_basecase c
     WHERE scenario.predicate[c.out_1/$1]
     \end{minted}
@@ -216,7 +203,7 @@ Evaluation of a single scenario is rather simple. UDF-arguments like \texttt{\$1
     \label{macro:single_basecase}
 \end{figure}
 
-For efficiency, nodes of recursive scenarios are filtered from the callgraph (resulting in CTE \texttt{calls\_to\_basecase}) as they cannot belong to basecases. If a callsite with argument \texttt{out\_1} can be found as input argument \texttt{in\_1} in the callgraph, then \texttt{out\_1} belongs to a recursive scenario. Graphically speaking, the query selects nodes of the callgraph with no outgoing edges, namely leafs, which represents callsites that leads to basecases.
+For efficiency, nodes of recursive scenarios are filtered from the callgraph (resulting in CTE \texttt{calls\_to\_basecase}) as they cannot belong to basecases. If a callsite with argument \texttt{out\_1} can be found as input argument \texttt{in\_1} in the callgraph, then \texttt{out\_1} belongs to a recursive scenario. Graphically speaking, the query selects nodes from the callgraph with no outgoing edges (sinks in the callgraph resp. leafs in the calltree), which represents callsites that lead to basecases.
 
 \begin{figure}[h!]
     \centering
@@ -225,8 +212,7 @@ For efficiency, nodes of recursive scenarios are filtered from the callgraph (re
    WITH calls_to_basecase(out_1) AS (
        SELECT DISTINCT out_1 
        FROM callgraph AS c
-       WHERE NOT EXISTS (SELECT NULL FROM callgraph AS c2
-                         WHERE c2.in_1 IS NOT DISTINCT FROM c.out_1)
+       WHERE NOT EXISTS (SELECT NULL FROM callgraph AS c2 WHERE (c2.in_1) = (c.out_1))
    )
    <evaluate scenario(scenario[1], calls_to_basecases)>
      UNION ALL 
@@ -236,25 +222,24 @@ For efficiency, nodes of recursive scenarios are filtered from the callgraph (re
     \label{macro:basecases}
 \end{figure}
 
-The awkward \texttt{WHERE}-clause stirs from two issues. First, \texttt{IS NOT DISTINCT FROM} is the SQL-way of writing a simple \textit{=} while considering \mintinline{postgresql}{NULL=NULL} as true. This is required since \texttt{NULL} can be an argument of a callsite and needs to be matched with its result-row - tri-state logic hinders that. The \texttt{NOT EXISTS} comes from the fact that the simpler \texttt{NOT IN} is executed for every row as a subquery while \texttt{NOT EXISTS} is executed as a much more efficient antijoin. If disregarding this two issues, the \texttt{WHERE}-clause could be written easier to understand as \mintinline{postgresql}{c.out_1 NOT IN (SELECT c2.in_1 FROM callgraph c2)}.
-
+The unhandy \texttt{WHERE}-clause could be equivalently written as \mintinline{postgresql}{c.out_1 NOT IN (SELECT c2.in_1 FROM callgraph c2)}. %First, \texttt{IS NOT DISTINCT FROM} is the SQL-way of writing a simple \textit{=} while considering \mintinline{postgresql}{NULL=NULL} as true. This is required since \texttt{NULL} can be an argument of a callsite and needs to be matched with its result-row - tri-state logic hinders that.
+The subquery from \texttt{NOT IN} is executed for every row as a subquery while the \texttt{NOT EXISTS}-variant can be executed as a much more efficient anti-join.
 
 \subsection{Recursive scenario evaluation}
+
 The evaluation of recursive scenarios follows the schema of the evaluation of nonrecursive scenarios, but is a bit more involved. Callsite-results must be collected per scenario to decide if the scenario is evaluable yet. Only if all callsites of a scneario are evaluated, the scenario can be evaluated itself.
 
-This operation resembles relational divsion $\texttt{S} \div \texttt{R}$: When dividing \texttt{S} by \texttt{R}, table \texttt{S} is grouped by the attributes that are not involved as join-attributes with \texttt{R}. The grouped columns from \textit{S} are returned, if every row in the group have found a join-partner from \texttt{S}. By dividing \texttt{callgraph} by \texttt{evaluation} (projecting away \texttt{callgraph.call\_site\_id}), we obtain only those input arguments that are evaluable, ie. have all required callsite-results available.
+This operation resembles relational division $\texttt{S} \div \texttt{R}$: When dividing \texttt{S} by \texttt{R}, table \texttt{S} is grouped by the attributes that are not involved as join-attributes with \texttt{R}. The grouped columns from \textit{S} are returned, if every row in the group have found a join-partner from \texttt{S}. By dividing \texttt{callgraph} by \texttt{evaluation} (projecting away \texttt{callgraph.call\_site\_id}), we obtain only those input arguments that are evaluable, ie. have all required callsite-results available.
 
-\begin{wrapfigure}{r}{0.6\textwidth}
+\begin{figure}[h!]\centering
   \sqlcode{snippets/relational_division.sql}
   \caption{Selecting available callsite-results per scenario using relational division with \texttt{array\_agg}. Does not play well with array-arguments.}
   \label{relational_division}
-\end{wrapfigure}
+\end{figure}
 
 The difficulty is to collect those callsite-results. The intuitive approach is to add an \texttt{array\_agg(e.result)} to the relational division (\autoref{relational_division}) that collects the results per scenario. This works well as long as we do not allow arrays as arguments: \texttt{array\_agg} require all input arrays to have the same dimensionality.
 
-The solution is to avoid array aggregation and to "pivot" the groups instead: each callsite-result gets its own column. Pivoting is implemented by using Window-Functions and Partitions together with \texttt{nth\_value} instead of \texttt{GROUP BY} and \texttt{array\_agg}. This way, we circumvent any constraints regarding arrays and avoid expensive aggregation.
-
-\vspace{5mm}
+The solution is to avoid array aggregation and to "pivot" the groups instead: each callsite-result gets its own column. Pivoting is implemented by using window-functions and partitions together with \texttt{nth\_value} instead of \texttt{GROUP BY} and \texttt{array\_agg}. This way, we circumvent any constraints regarding arrays and avoid expensive aggregation.
 
 With this problem solved, evaluating a recursive scenario boiles down to replacing UDF-arguments and callsites with \texttt{callgraph}- resp. \texttt{evaluation}-references, similar to the evaluation of nonrecursive scenarios (\autoref{macro:single_basecase}). \autoref{macro:recursive_scenario_evaluation} gives a macro to evaluate a scenario utilizing the pivoting approach from above.
 
@@ -266,7 +251,12 @@ With this problem solved, evaluating a recursive scenario boiles down to replaci
     \vspace{3mm}
     \subcaption{(b) shows the result of the join, (c) the final result of the generated query and the effects of the ~\WHERE-clauses are annnotated: \circled{1} Do not consider arguments already evaluated callsites. \circled{2} Only consider callsites of the given scenario we are about to evaluate. \circled{3} Only keep rows where all callsites have an result available.}\label{}
     \end{minipage}%
-    \vspace{7mm}
+    \caption{Collecting callsite results of for evaluation of a scenario. The result for \texttt{fib(3)} is beeing evaluated. Table (a) shows the result of the }\label{macro:recursive_scenario_evaluation}
+\end{figure}
+\begin{figure}[h!]
+    \ContinuedFloat
+    \small
+    \centering
     \begin{minipage}[b]{\linewidth}
     \centering
     \begin{tabular}{c|c|p{10cm}p{1em}p{1cm}|c}
@@ -297,17 +287,18 @@ With this problem solved, evaluating a recursive scenario boiles down to replaci
     \DrawHLine[thick, opacity=0.5]{row3Start}{row3End}
     \subcaption{Result of the query. Rows filtered by \WHERE~ are striked through,}\label{}
     \end{minipage}%
-    \caption{Collecting callsite results of for evaluation of a scenario. The result for \texttt{fib(3)} is beeing evaluated. Table (a) shows the result of the }\label{macro:recursive_scenario_evaluation}
+    \caption{(continued)}
 \end{figure}
 
-The self-reference in recursive CTEs contains only the rows from the previous iteration, which is a problem when evaluating. Take the evaluation of \texttt{fib} for example (see \autoref{fig:fib_callstack_graph}): Each recursive scenario depends on the results from the last (\texttt{fib(n-1)}) and the penultimate iteration (\texttt{fib(n-2)}). Standard recursive CTE-semantics allows only access to \texttt{fib(n-1)}.
+The working-table in recursive CTEs contains only the rows from the previous iteration, which is a problem when evaluating. Take the evaluation of \texttt{fib} for example (see \autoref{fig:fib_callstack_graph}): Each recursive scenario depends on the results from the last (\texttt{fib(n-1)}) and the penultimate iteration (\texttt{fib(n-2)}). Standard recursive CTE-semantics allows only access to \texttt{fib(n-1)}.
 
-To work around this restriction, the working table is added to the actual result-rows in each iteration. If we choose this approach, the working-table will be never empty, but an empty working-table is the stopping criterion for evaluation of the CTE. Therefore we need to manually take care of returning an empty table when evaluation should stop. To achieve this, the new rows are computed seperately in a CTE and guard also addition of the previous results. \autoref{macro:evaluation_cte}, that shows the final \texttt{evaluation}-CTE, implements this approach.
+To work around this restriction, the working table is added to the actual result-rows in each iteration. If we choose this approach, the working-table will be never empty, evaluation would never end. Therefore we need to manually take care of returning the empty table when evaluation should stop. To achieve this, new rows are computed seperately in a CTE and used as guard to prevent addition of the previous results if the CTE contains no rows. \autoref{macro:evaluation_cte}, that shows the final \texttt{evaluation}-CTE, implements this approach.
 
-\begin{figure}[h!]
+\begin{figure}[h!]\centering
   \sqlcode{snippets/evaluation_cte.sql}
   \caption{High-level structure of the evaluation-CTE}\label{macro:evaluation_cte}
 \end{figure}
+
 
 
 \FloatBarrier
@@ -383,12 +374,12 @@ in\_n & result \\\hline
 
 How is this situation detectable? If at least one path in the callgraph contains a loop, this path have no basecase where evaluation could start and thus evaluation will stop eventually without having evaluated the root-node. There is no row in the \textit{evaluation}-CTE containing a result for the original UDF-arguments. Instead of returning an empty table, an infinite loop is triggered (\autoref{fig:some_loop}).
 
-
 \begin{figure}[h!]
     \centering
     \sqlcode{snippets/result_collection.sql}
-    \caption{}
+    \caption{Result collection}
     \label{macro:result_collection}
+    \vspace*{-3cm}
 \end{figure}
 
 
@@ -400,18 +391,15 @@ How is this situation detectable? If at least one path in the callgraph contains
 % Adding CTEs
 % Post processing
 
+This chapter gives detailed insights of how a given query is sliced into its scenarios and predicates by presenting inference rules. Before each inference rule, I give an intuition of the idea first, before formalizing it.
 
-Implementing a complex algorithmic idea straight away and refining it while implementing is difficult. The implementation is always just an encoding of an abstract idea, cluttered with language-specific details. Thus, we use abstract inference rules to formalize the idea of slicing a query into its evaluation scenarios. This rules are implemented very closely in the Haskell implementation.
+I begin with presenting a set of four rules that are required to translate most basic \CASE-expressions. The nonrecursive rules \RREC und \RBASE handle the base cases when the SQL-fragment is directly a recursive call resp. does not contain any call at all. Disassembling \CASE-expressions is the true core of the translation process as it is the origin of any scenario. Each \WHEN-\THEN~branch is processed step by step by the \RWHEN-rule and eventually the \ELSE-branch by the \RELSE-rule.
 
-This chapter gives detailed insights of how a given query is sliced into its scenarios and predicates by presenting inference rules. Before introducing the actual formal rules, I will first give an intuition of how the translation idea for each language construct works, before formalizing it.
-
-I begin with presenting a set of four rules that are required to translate simple \CASE-expressions. The nonrecursive rules \RREC und \RBASE handle the case when the SQL-fragment is directly a recursive call resp. does not contain any call at all. Disassembling \CASE-expressions is the true core of the translation process as it is the origin of any scenario. Each \WHEN-\THEN~branch is processed step by step by the \RWHEN-rule and eventually the \ELSE-branch by the \RELSE-rule.
-
-To translate expressions and whole queries four further rules are required that all boil down to a common idea. This idea is that functions have a number of recursive operands that can be translated independently from each other. The different combinations of argument-scenarios form different scenarios of the function itself. Functions in this context can not only be actual functions like \texttt{+}, \texttt{GREATEST} or \texttt{fib}), but also any syntactic construct (eg. \texttt{IS BETWEEN}, \texttt{INNER JOIN}, \texttt{UNION}) that can be understood as one computation step with independant arguments. This schema is also applicable for select- and from-clauses.
+To translate expressions and whole queries four further rules are required that all boil down to a common idea. This idea is that functions have a number of recursive operands that can be translated independently from each other. The different combinations of argument-scenarios form different scenarios of the function itself. Functions in this context can not only be actual functions like \texttt{+}, \texttt{GREATEST} or \texttt{fib}), but also any syntactic construct (eg. \texttt{IS BETWEEN}, \texttt{INNER JOIN}, \texttt{UNION}) that can be understood as one computation step with independent arguments. This schema is also applicable for select- and from-clauses.
 
 Finally, we allow the use of CTEs that come with a couple of complexities. Due to CTEs, it is possible that a recursive SQL-fragment does not contain a callsite directly but indirect via referenced CTEs. Furthermore, CTEs can reference other CTEs so it is necessary to track CTE-dependencies and maintain a list of recursive CTEs while taking shadowing into account.
 
-Before the templates can be finally filled, each scenario needs to be enriched with some information. A data-structure is the template-macros use to create the final templates. As a part of this, callsite-arguments are extracted from each callsite in every scenario. I provide a set of inference rules that perform this task while handling CTE the same way as in the rules for scenario generation.
+To retrieve the intermediate representation used by the templates, each scenario is augmented with additional information. Most notably, callsite-arguments are extracted from the surrounding query. I provide a set of inference rules that perform this task while handling CTE the same way as in the rules for scenario generation.
 
 \section{Preliminaries}\label{approach}
 
@@ -419,9 +407,9 @@ Before the templates can be finally filled, each scenario needs to be enriched w
 
 A Structural Operational Semantic is an abstract way to define program evaluation step by step. Formally stated, it defines relations between states of an abstract machine. A state $S = (E, c)$ consists of an environment $E$ and some "code" $c$. Relations define transitions between two states. The notation $S \rightarrow S'$ (read: "$S$ evaluates \textit{in one step} to $S'$") is so just a shorthand for $(S, S') \in \rightarrow$ where $\rightarrow$ is the relation. In my rules, the environment does not change during a rule application so we can shorten notation and write $E \vdash c \rightarrow c'$. \cite[Chapter 2]{semanticsWithApplications}
 
-A rule may have a number of \textit{premises} $p_1, p_2, \dots, p_n$ that must hold for the rule to be applicable. This premises are written on top of a line above the rule. This premises may include \textit{judgments} over transitions $T \rightarrow* T'$, that depict that two states are element of the reflexive transitive closure of the relation, ie. that $T$ can be evaluated to $T'$.
+A rule may have a number of \textit{premises} $p_1, p_2, \dots, p_n$ that must hold for the rule to be applicable. This premises are written on top of a line above the rule. This premises may include \textit{judgments} over transitions $T \rightarrow^* T'$, that depict that two states are element of the reflexive transitive closure of the relation, ie. that $T$ can be evaluated to $T'$.
 
-$$\quad(\textsc{rule})\inferrule{
+$$\quad(\textsc{name})\inferrule{
    p_1\\
    p_2\\
    \dots\\
@@ -434,7 +422,9 @@ Evaluation happens by recursively applying transition rules from a starting stat
 
 The provided rules give deterministic evaluation steps, ie. at most one rule is applicable at a time. This makes the rules a bit more verbose, but simplifies implementation as no backtracking need to be implemented to find the applicable rule.
 
-In the case of the scenario analysis, the state is $(C, T, q, r)$. $C$ is a store used for CTEs that works like a hash-map${}^+$. $C[a, b]$ returns the CTEs from the store with alias $a$ and $b$, if present. The empty CTE-store is denoted as $\varnothing$. $T$ is a set of table-references in scope that are recursive. $q$ is the input query and $r$ is the result of the analysis. $C$ and $T$ are taken as environment. An analysis result $r$ with three scenarios could like this:
+In the case of the scenario analysis, the state is $(C, T, q, r)$. $C$ is a ordered set of tuples. $C[\{a, b\}]$ returns a subset of $C$ with elements with an alias of $a$ or $b$. The empty CTE-store is denoted as $\varnothing$. $T$ is a set of aliases of CTEs. $q$ is the input query and $r$ is the result of the analysis. $C$ and $T$ are taken as environment.
+
+The analysis result $r$ is a tuple $(B, R)$ containing a set of nonrecursive (basecase) scenarios in $B$ and a set of recursive scenarios in $R$. Each scenario consists of a predicate $p$ and a query that represents a "slice" of the original UDF $q$. An analyzsis result with three scenarios could like this:
 $$
 \Big(
     \overbrace{\big\{
@@ -455,7 +445,7 @@ $$
 $$
 
 \subsection{Subset of SQL}
-Rules to analyze arbitrary queries would need to consider every single language construct. Instead, we focus on a smaller subset of SQL (\autoref{lst:sql_grammar}) to keep the number of rules small and demonstrate the core idea. Generalizations can be added easilly later. The grammar describes nested WITH-SELECT-FROM-WHERE queries with query-combining functions.
+Rules to analyze arbitrary queries would need to consider every single language construct. Instead, we focus on a smaller subset of SQL (\autoref{lst:sql_grammar}) to keep the number of rules small and demonstrate the core idea. Generalizations can be added later, if necessary. The grammar describes nested \texttt{SELECT-FROM-WHERE} queries (S-F-W) with (nonrecursive) CTEs and query-combining functions.
 
 Functions in the grammar are stated in praefix-notation, even if the actual function comes in the form of eg. \texttt{i IS BETWEEN a AND b}, \texttt{x[n]} or \texttt{a IN (<query>)}. Those syntactic details are not visible when represented as AST and all constructs that act like a function are considered a function during translation.
 
@@ -482,25 +472,12 @@ Functions in the grammar are stated in praefix-notation, even if the actual func
 
 %\subsection{No VOLATILE functions}
 %Without referential transparancy we cannot assume that two function calls within the same query return the same value, making it impossible to use memoization. Therefore, only UDFs markes as STABLE or IMMUTEABLE (38.7. Function Volatility Categories) are translateable.
-%Since we use \texttt{UNION} during the evaluation-phase, the rows are checked on equality. This confronts us with a quirk of PostgreSQL: Composite types have no built in function to check equality, thus \texttt{UNION} fails while checking if two composite-types are equal. Later on we will lift this constraint by casting the nonhashable types to and from text.
-
-%Normal UNION require sortable or hashable, but in WITH RECURSIVE it is always hashable, see\footnote{https://www.postgresql-archive.org/Hashable-custom-types-td5801576.html, https://www.postgresql.org/docs/10/static/xindex.html#XINDEX-OPCLASS-DEPENDENCIES, }
 
 \subsection{Notation and vocabulary}
 
-
-We say a subtree in the query-block of an UDF named $fn$ has or contains a callsite, if and only if the tree contains a node with a call to the function itself or contains a reference to a table that has a callsite. This table in turn does not need to contain an explicit recursive call but can also contain a reference to a table that is recursive by this definition. This comes from the property that table-references are transitive.
+We say a query-fragment $q$ of an UDF named $fn$ contains a callsite or is recursive, if the AST of $q$ contains a node with a call to the $fn$ itself or references a recursive table-variable. The latter is a bit involved (see \autoref{tracking_recursive_ctes}), so we use a simplified variant of $\hasCallsite$ for the beginning that does not take references into account:
 
 $$\hasCallsite(e) = fn \sqsubset e$$
-
-% \subsection{Auxillary notations}
-%\begin{align*}
-%    T[a \mapsto \top] &:= T \cup \{a\}\\
-%    T[a \mapsto \bot] &:= T \setminus \{a\}\\
-%    T[a_1 \mapsto r_1, ..., a_n \mapsto r_n] &:= T[a_1 \mapsto r_1] \cdots[a_n \mapsto r_n]\\
-%\end{align*}
-
-%For the CTE-store $C$ we define an ordered hash-map with the CTE-alias $a$ as key. The empty CTE-store is denoted as $\varnothing$. A new CTE, given by the CTE-body $t$, its predicate $p$ and the set of referenced CTEs on the same level $r$, is specified as $e=(t, p, r)$ alongside with its key $a$. It is appended to $C$ by the following operation: $C[a: e]$. Ordered subsets of $C$ can be retrieved by filtering for matching keys, ignoring keys not found: $C[\{a_1, ..., a_n, a_x\}] = \langle (a_1, t_1, p_1, r_1)_1, \dots, (a_n, t_n, p_n, r_n)_n\rangle$.
 
 %The auxiliary function $\sigma_{\text{cols}}$ is used to pick columns from the store by name, eg. $\sigma_{a, t, p, r}(C)$ returns the entire store $\langle (a, t, p, r)_1, \dots, (a, t, p, r)_n \rangle$ and $\sigma_p(C) = \langle p_1, \dots, p_n \rangle$ all predicates in the store.
 
@@ -534,7 +511,7 @@ The leafs of every derivation tree are axioms. The two most important axioms are
 %The inference rules are applied recursively to an initial query, processing each layer one by one. In the end, each derivation treeare two axioms\footnote{By definition, an axiom has no premises. Premises without further rule application are actually side-constraints that limit rule applicability. Therefore this rules are considered anyway "axioms".}. Either we arrive at a \textit{callsite}, ie. the invocation of the recursive function itself, or the current subtree contains no callsite at all. In the latter case, it is not necessary to descend any further, we can consider the remaining subtree as basecase.
 
 \begin{figure}[h]\small
-    \begin{minipage}[b]{.5\linewidth}
+    \begin{minipage}[b]{\linewidth}
     \centering % BASE
     
   $$
@@ -545,8 +522,8 @@ The leafs of every derivation tree are axioms. The two most important axioms are
     T, \varnothing \vdash (p, e) \rightarrow (\{(p, e)\},\{\})
 }$$
     \subcaption{}\label{rule:base}
-    \end{minipage}\hfill
-    \begin{minipage}[b]{.5\linewidth}
+    \end{minipage}\\
+    \begin{minipage}[b]{\linewidth}
     \centering % REC
 $$\quad(\textsc{rec})\inferrule{
    \forall i \in \{1, ..., n\} : \neg \hasCallsite(T, x_i)
@@ -563,7 +540,7 @@ The \RREC-rule enforces that no callsite may have a recursive argument. This res
 
 \subsection{Simple \CASE-expressions}
 \begin{wrapfigure}{r}{.3\textwidth}\centering
-\begin{minted}{sql}
+\begin{minted}{postgresql}
 CASE WHEN p1 THEN r1
      WHEN p2 THEN r2
      ELSE         r3
@@ -577,9 +554,9 @@ The other rules that are endeavoured in every nontrivial translation are those f
 
 \texttt{CASE}-expressions in general are a handy way of writing nested \texttt{IF}s. Each \texttt{WHEN} implies that all preceding \texttt{WHEN}'s have failed, ie. each \texttt{WHEN} contains an implicit negation of all preceding \texttt{WHEN}'s. Our goal is to make the implicit complete predicate explicit so that it can be executed independently.
 
-\autoref{flow:simple_case} visualizes the logical flow of a simple \texttt{CASE}-expression with callsites located in the first \texttt{WHEN} and in the \texttt{ELSE}-branch. An arrow to the right means that the predicate is fulfilled, an arrow down denotes the negation. Predicates $p_i$ are surrounded by a single lined border while doubled bordered box marks a possible result $r$ of the \texttt{CASE}-statement. An asterisk $\ast$ indicates an query-fragment that includes a recursive subexpressions (according to $\hasCallsite$).
+\autoref{flow:simple_case} visualizes the logical flow of a simple \texttt{CASE}-expression with callsites located in the first \texttt{WHEN} and in the \texttt{ELSE}-branch. An arrow to the right means that the predicate is fulfilled, an arrow down denotes the negation. Predicates $p_i$ are surrounded by a single lined border while doubled bordered box marks a possible result $r$ of the \texttt{CASE}-statement. An asterisk $\ast$ indicates a query-fragment that includes a recursive subexpressions (according to $\hasCallsite$).
 
-The segmented rectangles at the right (\label{scenarios:simple_case}) depict the generated scenarios from the \texttt{CASE}-expression. The asterisk flags a scenario with a recursive query. The second segment contains the predicate of the scenario, followed by the actual query.
+The segmented rectangles at the right (\autoref{scenarios:simple_case}) depict the generated scenarios from the \texttt{CASE}-expression. The asterisk flags a scenario as recursive ie. $\in R$, otherwise $\in B$. The second segment contains the predicate of the scenario, followed by the query, the actual slice of the original UDF.
 
 \begin{figure}[h!]
     \begin{minipage}[b]{.45\linewidth}
@@ -664,7 +641,7 @@ Recursive predicates cannot be evaluated during callgraph creation and are there
     \label{fig:my_label}
 \end{figure}
 
-This introduces a important constraint: No more callsites after a recursive predicate. The template for the callgraph creation makes the assumption that all callsites in a scenario will be evaluated. If the evaluation of one callsite is guarded by the evaluation of an other, both callsite are evaluated if they occur in the same scenario. This can cause nontermination or runtime errors.
+This introduces a important overall constraint: No more callsites after a recursive predicate. The template for the callgraph creation makes the assumption that all callsites in a scenario will be evaluated. If the evaluation of one callsite is actually conditioned by the evaluation of an other, our translation evaluates both if they occur in the same scenario. This would cause runtime errors or nontermination.
 
 \subsection{Nonrecursive subtrees}
 Subtrees with no callsite are taken as one big basecase. There is no need to do any further analysis because there are no more callsites that need to be seperated into their evaluation scenarios so that the callgraph can be built. In this case, the \RBASE-rule just adds the entire remaining \texttt{CASE}-expression to $B$.
@@ -703,7 +680,7 @@ Subtrees with no callsite are taken as one big basecase. There is no need to do 
 \end{figure}
 
 
-\subsection{Nested Case in \THEN}
+\subsection{Nested \texttt{CASE}-expressions}
 
 \texttt{CASE}-expression can be nested. Nesting can happen either within the predicate of the \texttt{WHEN}-part, or within the result of \texttt{THEN}-part. As dependant callsites are forbidden, either the predicate or the result can have a nested \texttt{CASE}-expression with a callsite, but not both. If there is a nested \texttt{CASE}-expression without a callsite, it is left unchanged (\RBASE-rule).
 
@@ -760,10 +737,7 @@ If a \CASE-expression is located in the \texttt{THEN}-part, the inner expression
     \label{fig:case_nested_in_when}
 \end{figure}
 
-\subsection{Nested Case in \WHEN's}
-\texttt{CASE}-expression can be nested inside the \texttt{WHEN}-part of an other \texttt{CASE}-expression. Only if the inner \texttt{CASE}-expression contains a callsite, it will be analyzed.
-
-The nested \texttt{CASE}-expression is analyzed and number of scenarios are returned. The particuliarity is here that the results of the scenarios are predicates. The scenario of the nested \texttt{CASE}-expression contains a predicate for a predicate. Therefore both, the predicate and the result of the inner scenarios, need to be added to the predicate of the outer scenario.
+If a recursive \texttt{CASE}-expression is nested inside the \texttt{THEN}-part, it is analyzed and number of scenarios is returned. The particularity here is that the results of the scenarios are predicates. Thus, the scenario of the nested \texttt{CASE}-expression contains a predicate and a predicate for the predicate. Therefore both, the predicate and the result of the inner scenario, need to be added to the predicate of the scenario of the outer \texttt{CASE}-expression.
 
 \begin{figure}[h!]
     \centering
@@ -814,17 +788,17 @@ The nested \texttt{CASE}-expression is analyzed and number of scenarios are retu
 
 The \RWHEN-rule works branch by branch. It is only applicable if not both, the predicate $p$ and the remaining branches $bs$, contain callsites (1st premise). Predicate $p$ and resulting expression $e$ are analyzed, obtaining scenarios $(B_p, R_p)$ for the predicate and $(B_e, R_e)$ for the resulting expression (2nd and 3rd premise). The nonrecursive scenarios of the predicate $B_p$ contain $n$ tuples of a predicate (of the scenario, ie. the "predicate of the predicate") and a result, the actual predicate (4th premise).
 
-The last premise analyzes the remaining branches for those scenarios where the predicate is nonrecursive (this from $B_p$). The predicate of the remaining branches is thus prepended with the (positive) predicate of the predicate $p_p$ and the negative actual predicate $p'$. The scenarios from later branches are added below in the actual rule to set of nonrecursive resp. recursive scenarios.
+The last premise analyzes the remaining branches for those scenarios where the predicate is nonrecursive (from $B_p$). The predicate of the remaining branches is thus prepended with the (positive) predicate of the predicate $p_p$ and the negated actual predicate $p'$. The scenarios from later branches are added in the actual rule to set of non-/recursive scenarios.
 
 \begin{figure}[h!]
     \centering\small
 
   \makebox[\textwidth][c]{$$\inferrule{
-    \neg (\hasCallsite(p) \land \hasCallsite(bs))\\\\
+    \neg (\hasCallsite(T, p) \land \hasCallsite(T, bs))\\\\
     T, C \vdash (\TRUE, p) \rightarrow (B_p, R_p) \\\\
     T, C \vdash (\TRUE, e) \rightarrow (B_e, R_e)\\\\
     B_p = \{(p_{p_1}, p'_1), ..., (p_{p_n}, p'_n)\} \\\\
-    \forall 1 \leq i \leq |B_p| : T, C \vdash (p_0 ~\AND~ p_{p_i}~\AND~\NOT~ p'_i,~ \CASE~ bs ~\END) \rightarrow (B_i, R_i) \\
+    \forall 1 \leq i \leq n : T, C \vdash (p_0 ~\AND~ p_{p_i}~\AND~\NOT~ p'_i,~ \CASE~ bs ~\END) \rightarrow (B_i, R_i) \\
 }{
 T, C \vdash (p_0, \CASE~ \WHEN ~p ~\THEN ~e ~bs ~\END) \rightarrow \\
 {\begin{tabular}{L}
@@ -837,7 +811,7 @@ T, C \vdash (p_0, \CASE~ \WHEN ~p ~\THEN ~e ~bs ~\END) \rightarrow \\
     \label{fig:my_label}
 \end{figure}
 
-The actual rule combines all sources of scenarios. The basecase scenarios (first component of the tuple) are build by combining all nonrecursive predicates ($B_p$) with the nonrecursive resulting expressions ($B_e$). These set of scenarios is unioned with the $n$ sets of scenarios from other branches $(B_i, R_i)$ (remember that $n$ is the number of nonrecursive predicate-scenarios).
+The actual rule combines all sources of scenarios. The basecase scenarios (first component of the tuple) are built by combining all nonrecursive predicates ($B_p$) with the nonrecursive resulting expressions ($B_e$). These set of scenarios is unioned with the $n$ sets of scenarios from other branches $(B_i, R_i)$ (remember that $n$ is the number of nonrecursive predicate-scenarios).
 
 The same happens analogiously for the second component of the tuple, the recursive scenarios. This time nonrecursive predicate-scenarios ($B_p$) are combined with recursive resulting expression scenarios ($B_e$). Additionally, scenarios with recursive predicates ($R_p$) are added.
 
@@ -854,9 +828,11 @@ $$\inferrule{
     \label{fig:my_label}
 \end{figure}
 
-With the four rules from the previous section, very simple \texttt{CASE}-expressions (with only constants or callsites) can be analyzed. Nonrecursive subtrees of the AST are handlded by the \RBASE-rule and allsites are considered with the \RREC-rule. What follows now, is a rule to traverse expressions like \texttt{1 + fn(...)}.
+With the four rules from the previous section, very simple \texttt{CASE}-expressions (with constants or callsites only) can be analyzed. Nonrecursive subtrees of the AST are handlded by the \RBASE-rule and callsites are considered with the \RREC-rule. What follows now, is a rule to traverse expressions like \texttt{1 + fn(...)}.
 
 \section{Handling recursive operands}
+
+Expressions like \texttt{1 + fn(...)} cannot be translated by the \RBASE-rule nor by the \RREC-rule because the callsite is not at the root of the AST but in one of its subtrees. At the root, there is the \texttt{+}-operator, the left subtree is the constant \texttt{1} and the right subtree the callsite \texttt{fn(...)} (\autoref{ast:expr}).
 
 \begin{wrapfigure}{r}{.3\textwidth}
   \centering
@@ -874,9 +850,9 @@ With the four rules from the previous section, very simple \texttt{CASE}-express
   \label{ast:expr}
 \end{wrapfigure}
 
-Expressions like \texttt{1 + fn(...)} cannot be translated by the \RBASE-rule nor by the \RREC-rule because the the callsite is not at the root of the AST, it is located of one of its subtrees. At the root, there is the \texttt{+}-operator, the left subtree is the constant \texttt{1} and the right subtree the callsite \texttt{fn(...)} (\autoref{ast:expr}).
+The \REXPR-rules purpose is to traverse the AST and to analyze each subtree independently. I use the generic term of a \textit{function} to refer to syntactic constructs that consists of a node with multiple subtrees that are independent from each other. Beside built-in functions and UDFs those are operators, aggregates, subquery expressions (eg. \texttt{n IN (...)}), row-comparisons, array-element access, arrays itself and \texttt{VALUES}-lists. The last may be surprising first, but \texttt{(VALUES (1), (2), (3))} or \texttt{ARRAY[1, 2, 3]} is nothing else than a constructor -- a function.
 
-The \REXPR-rules purpose is to traverse the AST and to analyze each subtree independently. I use the generic term of a \textit{function} to refer to syntactic constructs that consists of a node with multiple subtrees that are independent from each other. Beside built-in functions and UDFs those are operators, aggregates, subquery expressions (eg. \texttt{n IN (...)}), row-comparisons, array-element access, arrays itself and \texttt{VALUES}-lists. The last may surprising first, but \texttt{(VALUES (1), (2), (3))} or \texttt{ARRAY[1, 2, 3]} is nothing else than a constructor -- a function.
+Multiple evaluation scenarios may be obtained for each subtree. These scenarios need to be combined again to return the different evaluation scenarios of the function itself. This is done by building the cross product between the scenarios of each subtree. We obtain all possible combinations of evaluation scenarios of the subtrees, constituting the scenarios of the function (\autoref{fig:expr-expr}).
 
 \begin{figure}[h]
     \centering
@@ -884,8 +860,6 @@ The \REXPR-rules purpose is to traverse the AST and to analyze each subtree inde
     \caption{Operands of a function are translated separately. For each operand a number of scenarios is generated. All possible scenarios of the original function are created by using the cross product.}
     \label{fig:expr-expr}
 \end{figure}
-
-Multiple evaluation scenarios may be obtained for each subtree. These scenarios need to be combined again to return the different evaluation scenarios of the function itself. This is done by building the cross product between the scenarios of each subtree. We obtain all possible combinations of evaluation scenarios of the subtrees, constituting the scenarios of the function (\autoref{fig:expr-expr}).
 
 \iffalse
 $
@@ -911,11 +885,7 @@ $
 $
 \fi
 
-The \REXPR-rule formalizes this idea (\autoref{rule:expr}). As meta-variable for any suitable function etc. $\oplus$ is used. Each subtree $e_i$ is translated independently, resulting in the $1 \leq i \leq n$ tuples of scenarios $(B_i, R_i$). Note that the rule is only applicable if at least on subtree contains a callsite, otherwise it would overlap with \RBASE.
-
-Nonrecursive scenarios of the function are created by replacing each argument with the expression from one of its scenarios. The cross product between all nonrecursive scenarios $B_i$ is used to build a set of all possible combinations of nonrecursive scenarios. The predicates $p_i$ of the scenario of each of the $n$ arguments are all unioned by \texttt{AND}. The arguments of the original function is replaced with the expressions generated by the scenarios.
-
-To create all scenarios of the function where at least one argument is recursive, the cross product between all scenarios of an argument (recursive and nonrecursive) is built. Only those combinations where at least one expression is recursive are kept.
+The \REXPR-rule formalizes this idea (\autoref{rule:expr}). $\oplus$ is used as meta-variable for any suitable function etc. Each subtree $e_i$ is translated independently, resulting in the $1 \leq i \leq n$ tuples of scenarios $(B_i, R_i$). Note that the rule is only applicable if at least on subtree contains a callsite, otherwise it would overlap with \RBASE.
 
 \begin{figure}[h!]
     \centering
@@ -934,9 +904,13 @@ $$\inferrule{
     \label{rule:expr}
 \end{figure}
 
-To translate entire queries we need to traverse the three different parts of a query: The \texttt{SELECT}-list, the \texttt{FROM}-list and the predicate in \texttt{WHERE}. The idea from the \REXPR-rule applies here as well, but some additionally premises must hold and some "side-effects" on the translation must be considered.
+Nonrecursive scenarios of the function are created by replacing each argument with the expression from one of its scenarios. The cross product between all nonrecursive scenarios $B_i$ is used to build a set of all possible combinations of nonrecursive scenarios. The predicates $p_i$ of the scenario of each of the $n$ arguments are all unioned by \texttt{AND}. The arguments of the original function is replaced with the expressions generated by the scenarios.
 
-Only one of the three clauses may be recursive. If the \texttt{WHERE}-clause contains a callsite, any other callsites located elsewhere in the query would depend on that callsites from the predicate in the \texttt{WHERE}-clause. If a callsite is present in the \texttt{FROM}-list, the execution of the \texttt{SELECT}- and \texttt{WHERE}-clauses and any callsites within would depend on the callsite in the \texttt{FROM}-list. Therefore, only one of the three parts of a query may contain a callsite.
+To create all scenarios of the function where at least one argument is recursive, the cross product between all scenarios of an argument (recursive and nonrecursive) is built. Only those combinations where at least one expression is recursive are kept.
+
+To translate entire queries we need to traverse the three different parts of a query: The \texttt{SELECT}-list, the \texttt{FROM}-list and the predicate in \texttt{WHERE}. The idea from the \REXPR-rule applies here as well, but some additionally premises must hold. Only one of the three clauses may be recursive. If the \texttt{WHERE}-clause contains a callsite, any other callsites located elsewhere in the query would depend on that callsites. If a callsite is present in the \texttt{FROM}-list, the execution of the callsites within \texttt{SELECT}- and \texttt{WHERE}-clauses would depend on the callsite in the \texttt{FROM}-list. Therefore, only one of the three parts of a query may contain a callsite.
+
+As of know, there are three different rules to analyze callsites in each clause of a query. In the future, they could be probably combined into an extended version of the \REXPR-rule as all four rules do basically the same.
 
 \begin{figure}[h!]
     \centering
@@ -945,12 +919,12 @@ Only one of the three clauses may be recursive. If the \texttt{WHERE}-clause con
     \label{fig:expr-select}
 \end{figure}
 
-The idea how to analyze queries follows directly the idea of the \REXPR-rule (\autoref{fig:expr-select}). Each target from the \texttt{SELECT}-list is analyzed independently and used to reconstruct the actual \texttt{SELECT}. Other parts of the query are unchanged and will not analyzed at all, as they must have no callsites.
+The idea how to analyze queries with callites in the select-list follows directly the idea of the \REXPR-rule (\autoref{fig:expr-select}). Each target from the \texttt{SELECT}-list is analyzed independently and used to reconstruct the actual \texttt{SELECT}. Other parts of the query are unchanged and will not analyzed at all, since they must be nonrecursive.
 
-The inference rule (\autoref{rule:select}) is nearly identical to the \REXPR-rule, only additional premises enforce the constraints stated above. Another difference is, that the "function" representing the query is not entirely analyzed but only the \texttt{SELECT}-clause. Actually, translating the entire query would also work with the given premises, as the other parts of the query would directly lead to the \RBASE-rule, leaving them unchanged.
+The inference rule (\autoref{rule:select}) is nearly identical to the \REXPR-rule, only additional premises enforce the constraints stated above. Another difference is, that the "function" representing the query is not entirely analyzed but only the \texttt{SELECT}-clause. Other clauses do not contain callsites and would lead to the application the \RBASE-rule, leaving them unchanged.
 
 \begin{figure}[h!]
-    \centering\small
+    \centering\footnotesize
   \makebox[\textwidth][c]{
 $$\inferrule{
     \exists i \in \{1, ..., n\}: T \vdash \hasCallsite(e_i) \\
@@ -973,14 +947,10 @@ $$\inferrule{
 
 
 
-A recursive \texttt{FROM}-clause works analogously, the \RFROM-rule is nearly identical (\autoref{rule:from}). Instead of the \texttt{SELECT}-list, the \texttt{FROM}-list is analyzed. 
-
-Table-variables from CTEs are independant from aliases introduced by items from the \texttt{FROM}-list. \texttt{FROM} is the only place where \textit{table-variables} can be used. When using a subquery like \mintinline{sql}{FROM (SELECT 1) AS T(v)} it introduces a new \texttt{row-reference}, the actual table is anonymous. Even when using \texttt{LATERAL} (which we forbid as of now), only \textit{rows} of the previous tables can be used, no reference to the entire table, given by the subquery, is possible.
-
-If using a subquery to define a table, the callsite is located directly in the subtree. Only when using references to recursive tables, the callsite can be outside the current subtree. As recursive tables can only be defined by CTEs, it is sufficient to track recursive CTE-references only.
+A recursive \texttt{FROM}-clause works analogously, the \RFROM-rule is nearly identical \RSELECT-rule (\autoref{rule:from}). Instead of the \texttt{SELECT}-list, the \texttt{FROM}-list is analyzed. Other parts of the query cannot contain callsites and are left therefore unchanged.
 
 \begin{figure}[h!]
-    \centering\small
+    \centering\footnotesize
   \makebox[\textwidth][c]{
 $$\inferrule{
     \exists i \in \{1, ..., n\}: T \vdash \hasCallsite(e_i) \\
@@ -1003,7 +973,7 @@ $$\inferrule{
 
 \iffalse
 \begin{figure}[h!]
-    \centering\small
+    \centering\footnotesize
   \makebox[\textwidth][c]{
 $$\inferrule{
     \exists i \in \{1, ..., n\}: \hasCallsite(T, e_{f_i}) \\
@@ -1027,7 +997,9 @@ $$
 \end{figure}
 \fi
 
-The \RWHERE-rule (\autoref{rule:where}) is is simpler because there is just a single expression that need to be analyzed and replaced. Actually, all three rules to handle queries could be combined into a single rule. The premises would need to enforce that exactly one of the three parts contains a callsite and the actual rule would analyze all parts of the query. If we augment the \REXPR-rule with appropriate premises, all three rules could probably be replaced by the \REXPR-rule.
+Finally, the callsite may be located inside the where-clause of the query. The \RWHERE-rule (\autoref{rule:where}) is is simpler because there is just a single expression that need to be analyzed and replaced in the query. Other parts of the query do not have to be considered.
+
+%Probably all three rules to handle queries could be combined into a single rule. The premises would need to enforce that exactly one of the three parts contains a callsite and the actual rule would analyze all parts of the query. If we augment the \REXPR-rule with appropriate premises, all three rules could probably be replaced by the \REXPR-rule.
 
 \begin{figure}[h!]
     \centering\small
@@ -1098,15 +1070,15 @@ $
 
 \section{Handling CTEs}
 
-Common Table Expressions (CTEs) are a powerful tool to structure and tweak complex queries. They work like temporary tables that only exist for an individual query. But allowing CTEs with callsites introduces some complexities that need to be handled.
+Common Table Expressions (CTEs) are a powerful tool to structure and tweak complex queries. They work like temporary tables that only exist for an individual query. But allowing CTEs that may contain callsites introduce some complexities that need to be considered when analyzing.
 
 % Without CTEs hasCallsite just checks the subtree
 With S-F-W queries the notion of \textit{containing a callsite} (or being \textit{recursive}) is simple. If a query-fragment $e$ contains a callsite, the subexpression is recursive: $\hasCallsite(e) = fn \sqsubset e$. From an implementation point of view, it is as simple as filtering the AST of $e$ for callsites.
 
-\begin{wrapfigure}{r}{.5\textwidth}\vspace{-5mm} 
+\begin{wrapfigure}{r}{.5\textwidth} 
     \begin{minipage}{\linewidth}
     \label{fig:simple_indiref}\par\vfill
-    \begin{minted}{sql}
+    \begin{minted}{postgresql}
     WITH S AS (SELECT f(n-1)),
          T AS (SELECT * FROM S)
     SELECT * FROM T
@@ -1114,7 +1086,7 @@ With S-F-W queries the notion of \textit{containing a callsite} (or being \texti
     \subcaption{Neither the actual query nor the referenced CTE \texttt{T} directly contains a callsite.}
     \label{fig:indirect_callsite}\par
     \vspace{3mm}
-    \begin{minted}{sql}
+    \begin{minted}{postgresql}
     SELECT (
         WITH T AS (SELECT f(n-1))
         SELECT 1
@@ -1128,17 +1100,17 @@ With S-F-W queries the notion of \textit{containing a callsite} (or being \texti
 \end{wrapfigure}
 
 % CTEs introduce indirect callsites that make callsite detection more complicated
-With CTEs we need to consider two additional issues. First, callsites can now be located outside the current subtree by referencing recursive CTEs (\autoref{fig:indirect_callsite}). Second, a scenario may contain unused recursive CTEs, fooling $\hasCallsite$ as stated above to believe a given SQL-fragment is recursive, even if the recursive CTEs are unused and thus never evaluated (\autoref{fig:unused_callsite}).
+With CTEs we need to consider two additional issues. First, callsites can now be located outside the current subtree by referencing recursive CTEs (\autoref{fig:indirect_callsite}). Second, a scenario may contain unused recursive CTEs, fooling $\hasCallsite$ as stated above to believe a given query-fragment is recursive, even if the recursive CTEs are unused and thus never evaluated (\autoref{fig:unused_callsite}).
 
 % Removing all CTEs, translating then and then reattaching only used CTEs fixes this.
-We can counter this issues, if we remove the CTEs from the original query before translating the actual query. For each query-scenario only those scenarios of CTEs are reattached afterwards, that are actually used (\autoref{tracking_recursive_ctes}). To detect indirect callsite references, we note recursive CTEs when detaching (\autoref{tracking_cte_dependencies}) and check against that list if we encounter free table-variables in the query.
+We can counter this issues, if we remove the CTEs from the original query before translating the actual query. For each query-scenario only those scenarios of CTEs are reattached afterwards that are actually used (\autoref{tracking_recursive_ctes}). To detect indirect callsite references, we note recursive CTEs in a list when detaching (\autoref{tracking_cte_dependencies}) and check against that list if we encounter free table-variables in the query.
 
 \subsection{Tracking recursive CTEs}\label{tracking_recursive_ctes}
 
 % Recursive CTEs are gathered step by step 
-CTEs may contain callsites and therefore need to be analyzed and sliced into evaluation scenarios. They need to be processed step by step before the actual query to allow later CTEs to reference preceeding CTEs. If a CTE-scenario contains a callsite, its alias is added to the list of recursive CTEs $T$ in scope. Otherwise, the alias is removed from that list to take shadowing into account as CTEs can be nested (\autoref{lst:indirect_callsite_ref}).
+CTEs may contain callsites and therefore need to be analyzed too. They are processed step by step before the actual query. This enables a CTE to reference preceeding CTEs. If a CTE-scenario contains a callsite, its alias is added to the list of recursive CTEs $T$ in scope. Otherwise, the alias is removed from that list because the new CTE shadows any outer recursive CTE with the same name (\texttt{WITH}-queries can be nested). (\autoref{lst:indirect_callsite_ref}).
 
-As we continue with the following CTEs, any CTE that has no direct callsite but contains a reference to a CTE in $T$ is also added itself to $T$ as the evaluation of that CTE will eventually lead to a recursive call. This way, we can build up $T$ incrementally and do not need to track each reference recursively back to its declaration to find out whether its recursive. For an example see \autoref{fig:tracking_recursive_ctes}
+Whenever an query-fragment is encountered that references a CTE from $T$, we know that this fragment is recursive. This way, we can build up $T$ incrementally and do not need to track each reference recursively back to its declaration to find out whether its recursive. For an example see \autoref{fig:tracking_recursive_ctes}.
 
 \begin{figure}[h]
     \small
@@ -1171,10 +1143,10 @@ As we continue with the following CTEs, any CTE that has no direct callsite but 
 \end{figure}
 
 % Referenced CTEs are detected via unbound variables
-References to CTEs can be easily extracted from a SQL-fragment by collecting free table-variables. The function to compute all free table-variables of a query-fragment $e$ is called $\FV(e)$. It is implemented straight forward: Each CTE definition within a \WITH-block adds its alias to the list of bound table-variables. Every reference to a table-variable that is not contained in that list is considered free.
+References to CTEs can be easily collected from a query-fragment by searching for free table-variables. The function to compute all free table-variables of a query-fragment $e$ is called $\FV(e)$. Its implemention is straight forward: Each CTE definition within a \WITH-block adds its alias to the list of bound table-variables. Every reference to a table-variable that is not contained in that list is considered free.
 
 \begin{wrapfigure}{r}{0.4\textwidth}
-    \begin{minted}{sql}
+    \begin{minted}{postgresql}
     WITH T AS (SELECT fn(n-1))
     SELECT *
     FROM (
@@ -1187,11 +1159,21 @@ References to CTEs can be easily extracted from a SQL-fragment by collecting fre
 \end{wrapfigure}
 
 % Row-references vs. table-variables
-Note that there can occur two different types of free variables inside a SQL-fragment: \textit{Table-Variables} and \textit{Row-References}. Table-variables like \texttt{T} can exclusively be used in ~\FROM~ and reference an entire table. This table-variables are introduced either by the existence of a table in the current database or by an CTE. Row-references like \texttt{T.v} point to a single table-row of a table referenced by ~\FROM. Not the actual "use" of a table-variable via a row-reference causes the recursive call, but its bare existence in the FROM-clause since it is evaluated first. For this reason it is sufficient to track only \textit{table}-variables and ignore row-references entirely.
+Note that there can occur two different types of free variables inside a query-fragment: \textit{Table-Variables} and \textit{Row-References}. Table-variables like \texttt{T} can exclusively be used in ~\FROM~ and reference an entire table. This table-variables are introduced either by the existence of a table in the current database or by an CTE. Row-references like \texttt{T.v} point to a single table-row of a table referenced by ~\FROM. A bare row-reference cannot cause a query to be recursive, it is always the from-clause that declares this row-references and binds it to a table. This table is always evaluated first, no matter of any row-reference is used at all. For this reason it is sufficient to track only \textit{table}-variables and ignore row-references entirely.
 
-As we now know which CTEs in scope are recursive, we can reformulate the function do determine whether a query-fragment contains something that depends on something recursive:
+As we now know which CTEs in scope are recursive, we can reformulate the function to determine whether a query-fragment contains a callsite directly or via a reference:
 $$\hasCallsite(T, e) = fn(\dots) \sqsubset e \lor \FV(e) \cap T \neq \emptyset$$
-Either the callsite is directly contained in $e$, or it has a free table-variable that is also enlisted in $T$. Otherwise the query-fragment is not recursive.
+Either the callsite is directly contained in $e$, or it contains a free table-variable that is also enlisted in $T$. Otherwise the query-fragment is not recursive.
+
+With indirect references, we need another axiom for recursive references:
+
+% REF
+$$\quad(\textsc{ref})\inferrule{
+   \text{isReference}(S) \\
+   T \vdash \hasCallsite(S)
+}{
+    T, C \vdash (p, S) \rightarrow (\{\}, \{(p, S)\})
+}$$
 
 %We process CTEs of a \WITH-block top down, before translating the actual \SELECT-query, resembling the way SQL evaluates them. If a CTE \texttt{T} references a CTE \texttt{S} that is recursive, \texttt{T} is also recursive. SQL evaluates CTEs in the order they are defined, so that preceding CTEs can be referenced by following CTEs (figure 4.4a FIXME?). Furthermore, CTEs can be nested so that we need to take care of shadowing out outer CTEs.
 
@@ -1200,17 +1182,9 @@ Either the callsite is directly contained in $e$, or it has a free table-variabl
 %Each CTE-scenario is augmented with its dependencies to previously defined CTEs. Each CTE is sliced into its different scenarios, then each scenario is analyzed, removed from the query and stored in the queue. When all CTEs are processed and the actual query is translated, only those CTEs are reattached to the query-scenario that are actually used. Indirect callsites can be detected by simply checking if there exists a free table-variable that is enlisted in $T$.
 
 \subsection{Tracking CTE-dependencies}\label{tracking_cte_dependencies}
-As we have seen, CTEs may use other CTEs so that we need to keep track of the CTE dependencies of a scenario. This happens similar to the creation of the set $T$ of recursive CTEs. For each CTE \texttt{C} we collect all CTE-references \texttt{$C_i$} and add them to the set of dependencies $D_c$. Because the used CTEs may have again dependencies, they are also added to $D_c$. 
+As we have seen, CTEs may use other CTEs so that we need to keep track of the dependencies of a scenario. This happens similar to the creation of the set $T$ of recursive CTEs. For each CTE \texttt{C} we collect all its CTE-references \texttt{$C_i$} from the scenario (predicate and query) together with their dependencies. For an illustration see \autoref{fig:cte_deps}.
 
-Tracking dependencies for scenario-queries is different from tracking dependencies for scenario-predicates. For scenario-queries it is sufficient to track references to CTEs. Tracking dependencies for predicates requires to include both, dependencies to CTEs and dependencies from 
-
-A scenario can have dependencies from both of its components: From the query and from the predicate. To track dependencies for scenario-queries it is sufficient to consider only other CTEs and dependencies within their scenario-query. For predicates additionally dependencies from other predicates must be included: Predicates can reference CTEs with predicates that reference CTEs and so on. 
-
-$$\refs_p(C, q) := \FV(q) \cup \left(\bigcup_{(\_, \_, \_, rs_t, rs_p) \in C[\FV(q)]} rs_t \cup rs_p \right)$$
-$$\refs_q(C, q) := \FV(q) \cup \left(\bigcup_{(\_, \_, \_, \_, rs_p) \in C[\FV(q)]} rs_t \right)$$
-
-Because of the ordering of CTEs we can do this while processing each CTE one by one. See \autoref{fig:cte_deps} for an illustration of how dependencies to other CTEs are tracked.
-
+\iffalse
 \begin{figure}[h!]
     \centering
     \begin{tikzpicture}[x=10mm, y=15mm, node distance=1cm]
@@ -1224,13 +1198,13 @@ Because of the ordering of CTEs we can do this while processing each CTE one by 
     
     \node[Box] (p1) at (0, 0)  {$p_1$};
     \node[Box, right of=p1] (q1) {$q_1$};
-    \node at (3, 0) {$\emptyset$};
-    \node at (5, 0) {$\{0\}$};
+    \node at (3, 0) {$\{0\}$};
+    \node at (5, 0) {$\emptyset$};
     
     \node[Box] (p2) at (0, -1)  {$p_2$};
     \node[Box, right of=p2] (q2) {$q_2$};
-    \node at (3, -1) {$\{0, 1\}$};
-    \node at (5, -1) {$\emptyset$};
+    \node at (3, -1) {$\emptyset$};
+    \node at (5, -1) {$\{1\}$};
     
     \node[Box] (p3) at (0, -2)  {$p_3$};
     \node[Box, right of=p3] (q3) {$q_3$};
@@ -1240,31 +1214,36 @@ Because of the ordering of CTEs we can do this while processing each CTE one by 
     \node[Box] (p4) at (0, -3)  {$p_4$};
     \node[Box, right of=p4] (q4) {$q_4$};
     \node at (3, -3) {$\emptyset$};
-    \node at (5, -3) {$\{3\}$};
+    \node at (5, -3) {$\emptyset$};
     
     \node[Box] (p5) at (0, -4)  {$p_5$};
     \node[Box, right of=p5] (q5) {$q_5$};
-    \node at (3, -4) {$\{3, 4\}$};
-    \node at (5, -4) {$\{0, 1\}$};
+    \node at (3, -4) {$\{4\}$};
+    \node at (5, -4) {$\{1, 4\}$};
     
     \node[Box, minimum width=2cm] (p) at (-1.5, -5){$p$};
     \node[Box, minimum width=2cm] (q) at (0.5, -5) {$q$};
     \node at (3, -5) {$\{0, 1, 2, 3\}$};
-    \node at (5, -5) {$\{0, 1, 5\}$};
+    \node at (5, -5) {$\{1, 4, 5\}$};
     
-    \draw[->] (q1.north) to (q0.south);
-    \draw[->] (p2.north) to (q1.south);
+    \node[Box, minimum width=7cm] (r) at (-1.5, -6){\texttt{WITH $q_0, q_1, q_2, q_3, q_4$ SELECT $p \land p_0 \land p_1 \land p_2 \land p_3 \land p_4 \land p_5$}};
+    \node[Box] at (5.37, -6) {\texttt{WITH $q_1, q_4, q_5$ SELECT $q$}};
+    
+    \draw[->] (p1.north) to (q0.south);
+    \draw[->] (q2.north) to (q1.south);
     \draw[->] (p5.north) to (q4.south);
     \draw[->] (p3.north) to (q2.south);
-    \draw[->] (q4.north) to (q3.south);
     \draw[->, bend left=40, in=140] (p.north) to (q3.south);
     \draw[->] (p5.north) to (q4.south);
     \draw[->, bend right=15] (q5.north east) to (q1.south east);
     \draw[->] (q.north) to (q5.south);
+    \draw[->] (q5.north) to (q4.south);
     \end{tikzpicture}
-    \caption{References are tracked incrementally by collecting free table-variables (ie. direct CTE references) along with the references of those free table-variables. Note that the use of $\refs$ here varies from its definition to illustrate the process more clearly.}
+    \caption{References are tracked incrementally by collecting free table-variables (ie. direct CTE references) along with the references of those free table-variables. Note that the use of $\deps$ here varies from its definition to illustrate the process more clearly.}
     \label{fig:cte_deps}
 \end{figure}
+\fi
+
 \begin{figure}[h!]
     \centering
     \begin{tikzpicture}[x=10mm, y=10mm]
@@ -1273,19 +1252,26 @@ Because of the ordering of CTEs we can do this while processing each CTE one by 
     \node[anchor=west] (B) at (0, -1) {\texttt{B} \AS $(b),$};
     \node[anchor=west] (C) at (0, -2) {\texttt{C} \AS $(c),$};
     \node[anchor=west] (D) at (0, -3) {\texttt{D} \AS $(d)$};
-    \node[anchor=west] (Ar) at (3, 0)  {$\refs(a) = \FV(a) \cup \emptyset = \emptyset$};
-    \node[anchor=west] (Br) at (3, -1) {$\refs(b) = \FV(b) \cup \emptyset = \emptyset$};
-    \node[anchor=west] (Cr) at (3, -2) {$\refs(c) = \FV(c) \cup (\refs(a) \cup \refs(b)) = \{\texttt{B}, \texttt{A}\} \cup \emptyset$};
-    \node[anchor=west] (Dr) at (3, -3) {$\refs(d) = \FV(d) \cup (\refs(c)) = \{\texttt{C}\} \cup \{\texttt{B}, \texttt{A}\}$};
+    \node[anchor=west] (Ar) at (3, 0)  {$\deps(a) = \FV(a) \cup \emptyset = \emptyset$};
+    \node[anchor=west] (Br) at (3, -1) {$\deps(b) = \FV(b) \cup \emptyset = \emptyset$};
+    \node[anchor=west] (Cr) at (3, -2) {$\deps(c) = \FV(c) \cup (\deps(a) \cup \deps(b)) = \{\texttt{B}, \texttt{A}\} \cup \emptyset$};
+    \node[anchor=west] (Dr) at (3, -3) {$\deps(d) = \FV(d) \cup (\deps(c)) = \{\texttt{C}\} \cup \{\texttt{B}, \texttt{A}\}$};
     \draw[->, bend right=60] (C) to (A);
     \draw[->] (C) to (B);
     \draw[->] (D) to (C);
     \end{tikzpicture}
-    \caption{References are tracked incrementally by collecting free table-variables (ie. direct CTE references) along with the references of those free table-variables. Note that the use of $\refs$ here varies from its definition to illustrate the process more clearly.}
+    \caption{References are tracked incrementally by collecting free table-variables (ie. direct CTE references) along with their dependencies. $a \rightarrow b$ means that $a$ contains a reference to $b$. Note that $\deps$ is simplified here to illustrate the process more clearly.}
     \label{fig:cte_deps}
 \end{figure}
 
-While shadowing was an issue when tracking recursive CTEs, it does not hit us here. The difference is that the list of recurisve table-variables $T$ was passed to further computation steps while $C$ is only nonempty at the level of the current query. Any new CTE in a subexpression $e$ binds the previously free table-variable, preventing it from occurring in the CTE-dependencies. Thus, $\FV(e)$ already takes care of shadowing here.
+The actual implementation differs from the example shown in \autoref{fig:cte_deps}. Each CTE is removed from the query after it is analyzed, therefore it is difficult to trace references recursively back. The ordering of CTEs enables us to perform this task incrementally, creating a full list of dependencies for every individual CTE while analyzing:
+
+$$\deps(C, q) := \FV(q) \cup \left(\bigcup_{(\_, \_, \_, ds) \in C[\FV(q)]} ds \right)$$
+
+The function $\deps$ collects free table-variables (ie. used CTEs) of $q$ together with their dependencies $ds$. CTE-dependencies are retrieved from the CTE-store $C$ using the CTEs used by $q$. Because CTEs cannot make forward-references, we obtain this way a full list of CTE-dependencies.
+
+%Different to tracking recursive CTEs, shadowing is not an issue here. The difference is that the list of recursive table-variables $T$ was passed down to further computation steps. Here, $C$ is only nonempty while processing CTEs of the same \texttt{WITH}-query where CTE-names are unique. Nested CTEs may shadow out outer CTEs indeed, but this issue is already solved by $\FV$.
+
 \iffalse
 \begin{figure}[h!]
     \centering
@@ -1325,6 +1311,116 @@ While shadowing was an issue when tracking recursive CTEs, it does not hit us he
 \end{figure}
 \fi
 
+\subsection{{\normalfont\RCTE}-rule: Collecting and analyzing CTE-Scenarios}
+
+The idea from the \REXPR-rule of building the cross product between all scenarios of its subtrees is also present in the \RCTE-rule. Yet, our extended notion of a function does not work the entire \texttt{WITH}-clause. There is no \texttt{WITH}-"function" node at the root with $n$ independent children, one for each CTE: $\texttt{WITH}(t_1, t_2, t_3, q)$. Its more a right-deep tree of individual CTE-definitions where each CTE depends on the preceeding CTEs: $\texttt{CTE}(t_1, \texttt{CTE}(t_2, \texttt{CTE}(t_3, q)))$. Therefore each \texttt{CTE} must be analyzed individually and the environment is modified for accordingly for every CTE-scenario. With the changed environment, following CTEs are analyzed and eventually the actual query $q$.
+
+The environment is changed in two ways: First, the list of recursive table-variables $T$ is updated. If the evaluation-scenario of the CTE is recursive, the alias of the CTE is added to $T$. If the CTE-scenario is nonrecursive, the alias is removed from $T$ since any recursive reference is now shadowed by this nonrecursive CTE. Second, the CTE-scenario is added alongside its dependencies to the CTE-store $C$.
+
+\begin{figure}[h!]
+    \centering\footnotesize
+\makebox[\textwidth][c]{
+$$\inferrule{
+    \hasCallsite(T, \WITH~ a_1 \AS t_1, ..., a_n \AS t_n~q)\\\\
+    T, \varnothing \vdash (p, t_1) \rightarrow (B, R) \\
+    \forall (p'_t, t') \in B: T \setminus \{a_1\}, C[a_1: (t', p'_t, \deps(C, t') \cup \deps(C, p'_t)] \vdash (p, \WITH~ a_2 \AS t_2, ..., a_n \AS t_n~q) \rightarrow (B_i, R_i) \\
+    \forall (p'_t, t') \in R: T \cup      \{a_1\}, C[a_1: (t', p'_t, \deps(C, t') \cup \deps(C, p'_t)] \vdash (p, \WITH~ a_2 \AS t_2, ..., a_n \AS t_n~q) \rightarrow (B_j, R_j)
+}{
+{\begin{tabular}{L}
+    T, C \vdash (p, \WITH~ a_1 \AS t_1, ..., a_n \AS t_n~q) \rightarrow \\
+             \Big( \big(\cup_{1 \leq i \leq k} B_i\big) \cup \big(\cup_{1 \leq j \leq l} B_j\big),\phantom{\Big)}\\
+    \phantom{\Big(}\big(\cup_{1 \leq j \leq k} R_j\big) \cup \big(\cup_{1 \leq j \leq l} R_j\big)\phantom{,}\Big)
+\end{tabular}}
+}\quad(\textsc{cte})$$
+}
+    \caption{\RCTE-rule}
+    \label{rule:cte}
+\end{figure}
+% Discussion
+%It may be possible to directly check whether the CTE will be referenced. This way the \RWITH-rule would be unnecessary and $C$ could be removed from the environment. The challange is to deconstruct the changed
+
+\iffalse %oooold
+$$\inferrule{
+    \hasCallsite(T, \WITH a_1 \AS t_1, ..., a_n \AS t_n~q)\\
+    T, \varnothing \vdash (p, t_1) \rightarrow (B, R) \\
+    ((B \times \{\bot\}) \cup (R \times \{\top\})) = \{(p'_{t_1}, t'_1, r_{i_1}), ..., (p'_{t_k}, t'_k, r_k)\} = X\\
+    \forall (p'_t, t', r_i) \in X: T[a_1 \mapsto r_i], C[a_1: (t', p'_t, \deps(t')] \vdash (p, \WITH a_2 \AS t_2, ..., a_n \AS t_n~q) \rightarrow (B_i, R_i)
+}{
+    T, C \vdash (p, \WITH a_1 \AS t_1, ..., a_n \AS t_n~q) \rightarrow ((\cup_{1 \leq i \leq k} B_i), (\cup_{1 \leq j \leq k} R_j)\})
+}\quad(\textsc{cte})$$
+\fi
+
+\subsection{{\normalfont\RWITH}-rule: Attaching used CTEs only}
+When all CTEs have been analyzed and moved the CTE-store $C$, the actual query is analyzed and required CTEs are reattached. This happens in three steps, nearly identical for recursive and nonrecursive scenarios of \texttt{q}. The only difference is the origin of the query scenario, once it is $B$ and once $R$.
+
+For both, scenario-predicate and -query, dependent CTE-scenarios are retrieved from $C$. The CTE-queries are attached to query and predicate. Predicates of the CTEs $p_1, \dots, p_n$ are added alongside $p$ to the resulting predicate.
+
+Note that we do not differentiate between CTEs referenced by the predicate only and CTEs referenced by the query only. As of now, all CTEs of the \textit{scenario} are added to the predicate and to the query. This could lead to unused CTEs for both the scenario-predicate as well as the scenario-query.
+
+CTEs referenced by the predicate must be nonrecursive, because scenario-predicates are always nonrecursive. Therefore any referenced CTE is also nonrecursive. This is important, because otherwise $\hasCallsite$ would not work correctly. Still, a recursive CTE referenced by the scenario-query can be included unnecessarily in the scenario-predicate. This is no problem as well, because predicates are never examined by $\hasCallsite$ and unused CTEs are not evaluated.
+
+Removing unsued CTEs from the scenario-predicate would clutter the inference rules, while only improving aesthetics. We would need to track differently dependencies of the scenario-predicate and -query. A scenario-predicate can use a CTE which again has a predicate that uses other CTEs. Dependencies of a scenario-predicate involves therefore all \textit{scenario-dependencies} (dependencies of predicate and query) while the dependencies of the scenario-query requires only to mind query to query references.
+
+%1) The actual query is analyzed, resulting in nonrecursive scenarios $B$ resp. $R$. 2) For the given scenario, the CTEs referenced by the query $q'$ are looked up from ($C[\deps_q(q')]$) and prepended to the resulting scenario-query. 3) All CTEs, referenced either by scenario-queries or scenario-predicates, are retrieved ($C[\deps_q(q') \cup \deps_p(p')]$) and their predicates ($p_1, ..., p_k$) are added to the resulting scenario-predicate. 4) As each predicate may include again references to CTEs, these references $dp_1, \dots,  dp_k$ are used to retrieve the CTE required to evaluate the scenario-predicate ($C[dp_1 \cup \dots \cup dp_k]$).
+
+\begin{figure}[h!]
+    \centering
+\makebox[\textwidth][c]{$$\inferrule{
+    C \neq \varnothing\\
+    T, \varnothing \vdash (p, q) \rightarrow (B, R)
+}{
+    T, C \vdash (p, \WITH~ q) \rightarrow \\\\
+    {\begin{tabular}[b]{LLLL}
+    \Big(~~&\big\{&(&\WITH~ a_1 \AS t_1, \dots, a_n \AS t_n~\SELECT~ p_q ~\AND~p_1 ~\AND~ \dots ~\AND~ p_n, \\
+          &&&\WITH~ a_1 \AS t_1, \dots, a_n \AS t_n~~q'~\\
+          &&| &~(p_q, q') \in B, C[\deps(C, q') \cup \deps(C, p')] = \langle (a_1, t_1, p_1, \_), \dots, (a_n, t_n, p_n, \_) \rangle \big\}\\[3mm]
+           &\big\{&(&\WITH~ a_1 \AS t_1, \dots, a_n \AS t_n~\SELECT~ p_q ~\AND~p_1 ~\AND~ \dots ~\AND~ p_n, \\
+          &&&\WITH~ a_1 \AS t_1, \dots, a_n \AS t_n~~q'~\\
+          &&| &~(p_q, q') \in R, C[\deps(C, q') \cup \deps(C, p')] = \langle (a_1, t_1, p_1, \_), \dots, (a_n, t_n, p_n, \_) \rangle \big\}\Big)\\
+    \end{tabular}}
+}\quad(\textsc{with})$$}
+    \caption{\RWITH-rule}
+    \label{rule:with}
+\end{figure}
+
+\iffalse both versions combined
+\makebox[\textwidth][c]{$$\inferrule{
+    C \neq \varnothing\\
+    T, \varnothing \vdash (p, q) \rightarrow (B, R)
+}{
+    T, C \vdash (p, \WITH~ q) \rightarrow \\\\
+    {\begin{tabular}[b]{LLLL}
+    \Big(~~&\big\{&(&\WITH~ a_1 \AS t_1, \dots, a_n \AS t_n~\SELECT~ p_q ~\AND~p_1 ~\AND~ \dots ~\AND~ p_n, \\
+          &&&\WITH~ a_1 \AS t_1, \dots, a_n \AS t_n~~q'~\\
+          &&| &~(p_q, q') \in B, C[\deps(C, q') \cup \deps(C, p')] = \langle (a_1, t_1, p_1, \_), \dots, (a_n, t_n, p_n, \_) \rangle \big\}\\[3mm]
+    &\big\{&(&\WITH~ a_1 \AS t_1, \dots, a_m \AS t_m~\SELECT~ p_q ~\AND~p_1 ~\AND~ \dots ~\AND~ p_k, \\
+          &&&\WITH~ a_1 \AS t_1, \dots, a_n \AS t_n~~q'~\\
+          &&| &~(p_q, q') \in R,\\
+          &&  &~C[\deps_q(C, q')] ~~~~~~~~~~~~~~~~~= \langle (a_1, t_1, \_, \_, \_), \dots, (a_n, t_n, \_, \_, \_) \rangle,\\
+          &&  &~C[\deps_p(C, p') \cup \deps_p(C, q')] = \langle (a_1, t_1, \_, \_, \_), \dots, (a_m, t_m, \_, \_, \_) \rangle,\\
+          &&  &~C[\deps_p(C, p') \cup \deps_q(C, q')] = \langle (\_, \_, p_1, \_, \_), \dots, (\_, \_, p_k, \_, \_) \rangle \big\}\Big)\\
+    \end{tabular}}
+}\quad(\textsc{with})$$}
+\fi
+
+\iffalse old
+\makebox[\textwidth][c]{$$\inferrule{
+    C \neq \varnothing\\
+    T, \varnothing \vdash (p, q) \rightarrow (B, R)
+}{
+    T, C \vdash (p, \WITH~ q) \rightarrow \\\\
+    {\begin{tabular}[b]{LLLL}
+    \Big(~~&\{&(&\WITH~ [a_i \AS t_i]^{(a_i, t_i) \in \sigma_{a, t}(P_{ctes})}~\SELECT~ (\AND_{p_i \in P}(p_i)), \\
+          &&&\WITH~ [a_i \AS t_i]^{(a_i, t_i) \in \sigma_{a, t}(q'_{ctes})}~~q'~\\
+          &&| &~(p_q, q') \in B,~ q'_{ctes} = C[\deps(q')],~P=\{p_q\} \cup \sigma_p(q'_{ctes}),~ P_{ctes} = C[\cup_{x_p \in P} \deps(x_p)]\},\\
+    &\{&(&\WITH~ [a_i \AS t_i]^{(a_i, t_i) \in \sigma_{a, t}(P_{ctes})}~\SELECT~ (\AND_{p_i \in P}(p_i)), \\
+    &&&\WITH~ [a_i \AS t_i]^{(a_i, t_i) \in \sigma_{a, t}(q'_{ctes})}~~q'~\\
+    &&|&~(p_q, q') \in R,~ q'_{ctes} = C[\deps(q')],~P=\{p_q\} \cup \sigma_p(q'_{ctes}),~ P_{ctes} = C[\cup_{x_p \in P} \deps(x_p)])\Big)
+    \end{tabular}}
+}\quad(\textsc{with})$$}
+\\
+\fi
+
 
 \subsection{Example}
 
@@ -1337,24 +1433,24 @@ While shadowing was an issue when tracking recursive CTEs, it does not hit us he
     \begin{minipage}[b]{.5\linewidth}
     \centering
      \begin{tikzpicture}
-    \node[anchor=west] (s1) at (0, 0) {
+    \node[anchor=west] (s1) at (0, 0) {\small
         \begin{tabular}{|p{1em}|l|l|}\hline
         \cellcolor{gray!25}                         & \mintinline{sql}{TRUE AND} ~~ & ~~\mintinline{sql}{WITH C AS (SELECT 1)}\\
         \cellcolor{gray!25}\multirow{-2}{*}{} & \mintinline{sql}{n <= 2}   ~~ & ~~\mintinline{sql}{SELECT (SELECT P.i FROM P)}\\\hline
         \end{tabular}
     };
-    \node[anchor=west, below=of s1] (s2) {
+    \node[anchor=west, below=of s1] (s2) {\small
         \begin{tabular}{|p{1em}|l|l|}\hline
         \cellcolor{gray!25}                         & \mintinline{sql}{TRUE AND}   ~~ & ~~\mintinline{sql}{WITH C AS (SELECT 1)}\\
         \cellcolor{gray!25}                         & \mintinline{sql}{n <> 3 AND }~~ & ~~\mintinline{sql}{     S(i) AS (SELECT fib_cte3(n-2))}\\
         \cellcolor{gray!25}\multirow{-3}{*}{$\ast$} & \mintinline{sql}{NOT n <= 2} ~~ & ~~\mintinline{sql}{SELECT (SELECT T.i + S.i FROM S, T)}\\\hline
         \end{tabular}
     };
-    \node[anchor=west, below=of s2] (s2) {
+    \node[anchor=west, below=of s2] (s2) {\small
         \begin{tabular}{|p{1em}|l|l|}\hline
-        \cellcolor{gray!25}                         & \mintinline{sql}{TRUE AND}      ~~ & ~~\mintinline{sql}{WITH C AS (SELECT 1)}\\
-        \cellcolor{gray!25}                         & \mintinline{sql}{NOT n <> 3 AND}~~ & ~~\mintinline{sql}{     S(i) AS (SELECT 1)}\\
-        \cellcolor{gray!25}\multirow{-3}{*}{$\ast$} & \mintinline{sql}{NOT n <= 2}    ~~ & ~~\mintinline{sql}{SELECT (SELECT T.i + S.i FROM S, T)}\\\hline
+        \cellcolor{gray!25}                         & \mintinline{postgresql}{TRUE AND}      ~~ & ~~\mintinline{postgresql}{WITH C AS (SELECT 1)}\\
+        \cellcolor{gray!25}                         & \mintinline{postgresql}{NOT n <> 3 AND}~~ & ~~\mintinline{postgresql}{     S(i) AS (SELECT 1)}\\
+        \cellcolor{gray!25}\multirow{-3}{*}{$\ast$} & \mintinline{postgresql}{NOT n <= 2}    ~~ & ~~\mintinline{postgresql}{SELECT (SELECT T.i + S.i FROM S, T)}\\\hline
         \end{tabular}
     };
     \end{tikzpicture}
@@ -1364,103 +1460,6 @@ While shadowing was an issue when tracking recursive CTEs, it does not hit us he
 \end{figure}
 
 
-\subsection{\RCTE-rule: Collecting and analyzing CTE-Scenarios}
-
-The idea from the \REXPR-rule of building the cross product between all constitutes can be found again in the \RCTE-rule. As the different CTEs of the \textit{WITH}-query are not independent from each other, the cross product cannot be built in one step. Instead, a CTE is analyzed and for each scenario obtained, the environment is modified accordingly as the analysis continues with the remaining CTEs and query.
-
-The environment is changed to update the list of recursive table-variables $T$. If the evaluation scenario of the CTE is recursive, the alias of the CTE is added to $T$. If the CTE-scenario is nonrecursive, the alias is removed from $T$ since any recursive reference is now shadowed by this nonrecursive CTE. Additionally, the CTE is added alongside its dependencies to the CTE-store $C$.
-
-Evaluation continues without the analyzed CTE as long as all CTEs are removed. The CTE-store contains now one of all possible combinations of CTE-scenarios. 
-
-All scenarios are finally unioned
-
-The \RCTE-rule analyzes one CTE at a time, removing it from the query for the processing of the following CTEs. Following CTEs are analyzed with an environment modified according to the evaluation scenario of the CTE. Each CTE-scenario inits 
-
-All possible combinations of CTE-scenarios of all CTEs in the query is incremental built: For each scenario of the CTE the computation continues with a different environment. This environment is updated according to each scenario.
-added to the CTE-store $C$ and the set $T$ of recursive table-variables is updated. For any recursive scenario of the CTE its alias is added to $T$. For nonrecursive scenarios, it is removed from $T$ to remove a possible existing entry that is now shadowed.
-
-
-
-$$\quad(\textsc{cte})\inferrule{
-    \hasCallsite(T, \WITH~ a_1 \AS t_1, ..., a_n \AS t_n~q)\\\\
-    T, \varnothing \vdash (p, t_1) \rightarrow (B, R) \\
-    \forall (p'_t, t') \in B: T \setminus \{a_1\}, C[a_1: (t', p'_t, \refs(C, t'), \refs(C, p'_t)] \vdash (p, \WITH~ a_2 \AS t_2, ..., a_n \AS t_n~q) \rightarrow (B_i, R_i) \\
-    \forall (p'_t, t') \in R: T \cup \{a_1\}, C[a_1: (t', p'_t, \refs(C, t'), \refs(C, p'_t)] \vdash (p, \WITH~ a_2 \AS t_2, ..., a_n \AS t_n~q) \rightarrow (B_j, R_j)
-}{
-{\begin{tabular}{L}
-    T, C \vdash (p, \WITH~ a_1 \AS t_1, ..., a_n \AS t_n~q) \rightarrow \\
-             \Big( \big(\cup_{1 \leq i \leq k} B_i\big) \cup \big(\cup_{1 \leq j \leq l} B_j\big),\phantom{\Big)}\\
-    \phantom{\Big(}\big(\cup_{1 \leq j \leq k} R_j\big) \cup \big(\cup_{1 \leq j \leq l} R_j\big)\phantom{,}\Big)
-\end{tabular}}
-}$$
-
-It may be possible to directly check whether the CTE will be referenced. This way the \RWITH-rule would be unnecessary and $C$ could be removed from the environment. The challange is to deconstruct the changed
-
-\iffalse %oooold
-$$\quad(\textsc{cte})\inferrule{
-    \hasCallsite(T, \WITH a_1 \AS t_1, ..., a_n \AS t_n~q)\\
-    T, \varnothing \vdash (p, t_1) \rightarrow (B, R) \\
-    ((B \times \{\bot\}) \cup (R \times \{\top\})) = \{(p'_{t_1}, t'_1, r_{i_1}), ..., (p'_{t_k}, t'_k, r_k)\} = X\\
-    \forall (p'_t, t', r_i) \in X: T[a_1 \mapsto r_i], C[a_1: (t', p'_t, \refs(t')] \vdash (p, \WITH a_2 \AS t_2, ..., a_n \AS t_n~q) \rightarrow (B_i, R_i)
-}{
-    T, C \vdash (p, \WITH a_1 \AS t_1, ..., a_n \AS t_n~q) \rightarrow ((\cup_{1 \leq i \leq k} B_i), (\cup_{1 \leq j \leq k} R_j)\})
-}$$
-\fi
-
-\sqlcode{snippets/from_shadowing.sql}
-
-\subsection{\RWITH-rule: Attaching used CTEs only}
-When all CTEs have been analyzed and moved the CTE-store $C$, the actual query is analyzed. Additionally, the required CTEs are reattached.
-
-This happens in three steps, nearly identical for recursive and nonrecursive scenarios of \texttt{q}. 1) The actual query is analyzed, resulting in nonrecursive scenarios $B$ resp. $R$. 2) For the given scenario, the CTEs referenced by the query $q'$ are looked up from ($C[\refs_q(q')]$) and prepended to the resulting scenario-query. 3) All CTEs, referenced either by scenario-queries or scenario-predicates, are retrieved ($C[\refs_q(q') \cup \refs_p(p')]$) and their predicates ($p_1, ..., p_k$) are added to the resulting scenario-predicate. 4) As each predicate may include again references to CTEs, these references $dp_1, \dots,  dp_k$ are used to retrieve the CTE required to evaluate the scenario-predicate ($C[dp_1 \cup \dots \cup dp_k]$).
-
-%Unused CTEs from predicates do no harm, because they are always nonrecursive. Unused recursive CTEs in predicates do no harm as well as predicate are not checked wheter recursive.
-
-\makebox[\textwidth][c]{$$\inferrule{
-    C \neq \varnothing\\
-    T, \varnothing \vdash (p, q) \rightarrow (B, R)
-}{
-    T, C \vdash (p, \WITH~ q) \rightarrow \\\\
-    {\begin{tabular}[b]{LLLL}
-    \Big(~~&\big\{&(&\WITH~ a_1 \AS t_1, \dots, a_n \AS t_n~\SELECT~ p_q ~\AND~p_1 ~\AND~ \dots ~\AND~ p_n, \\
-          &&&\WITH~ a_1 \AS t_1, \dots, a_n \AS t_n~~q'~\\
-          &&| &~(p_q, q') \in B, C[\refs(C, q') \cup \refs(C, p')] = \langle (a_1, t_1, p_1, \_), \dots, (a_n, t_n, p_n, \_) \rangle \big\}\\[3mm]
-    &\big\{&(&\WITH~ a_1 \AS t_1, \dots, a_m \AS t_m~\SELECT~ p_q ~\AND~p_1 ~\AND~ \dots ~\AND~ p_k, \\
-          &&&\WITH~ a_1 \AS t_1, \dots, a_n \AS t_n~~q'~\\
-          &&| &~(p_q, q') \in R,\\
-          &&  &~C[\refs_q(C, q')] ~~~~~~~~~~~~~~~~~= \langle (a_1, t_1, \_, \_, \_), \dots, (a_n, t_n, \_, \_, \_) \rangle,\\
-          &&  &~C[\refs_p(C, p') \cup \refs_p(C, q')] = \langle (a_1, t_1, \_, \_, \_), \dots, (a_m, t_m, \_, \_, \_) \rangle,\\
-          &&  &~C[\refs_p(C, p') \cup \refs_q(C, q')] = \langle (\_, \_, p_1, \_, \_), \dots, (\_, \_, p_k, \_, \_) \rangle \big\}\Big)\\
-    \end{tabular}}
-}\quad(\textsc{with})$$}
-\\
-\iffalse current
-\makebox[\textwidth][c]{$$\inferrule{
-    C \neq \varnothing\\
-    T, \varnothing \vdash (p, q) \rightarrow (B, R)
-}{
-    T, C \vdash (p, \WITH~ q) \rightarrow \\\\
-    {\begin{tabular}[b]{LLLL}
-    \Big(~~&\{&(&\WITH~ [a_i \AS t_i]^{(a_i, t_i) \in \sigma_{a, t}(P_{ctes})}~\SELECT~ (\AND_{p_i \in P}(p_i)), \\
-          &&&\WITH~ [a_i \AS t_i]^{(a_i, t_i) \in \sigma_{a, t}(q'_{ctes})}~~q'~\\
-          &&| &~(p_q, q') \in B,~ q'_{ctes} = C[\refs(q')],~P=\{p_q\} \cup \sigma_p(q'_{ctes}),~ P_{ctes} = C[\cup_{x_p \in P} \refs(x_p)]\},\\
-    &\{&(&\WITH~ [a_i \AS t_i]^{(a_i, t_i) \in \sigma_{a, t}(P_{ctes})}~\SELECT~ (\AND_{p_i \in P}(p_i)), \\
-    &&&\WITH~ [a_i \AS t_i]^{(a_i, t_i) \in \sigma_{a, t}(q'_{ctes})}~~q'~\\
-    &&|&~(p_q, q') \in R,~ q'_{ctes} = C[\refs(q')],~P=\{p_q\} \cup \sigma_p(q'_{ctes}),~ P_{ctes} = C[\cup_{x_p \in P} \refs(x_p)])\Big)
-    \end{tabular}}
-}\quad(\textsc{with})$$}
-\\
-\fi
-
-Additionally, we need an other axiom to add a table-reference to the set of recursive scenarios if it references a recursive CTE.
-
-% REF
-$$\quad(\textsc{ref})\inferrule{
-   \text{isReference}(S) \\
-   T \vdash \hasCallsite(S)
-}{
-    T, C \vdash (p, S) \rightarrow (\{\}, \{(p, S)\})
-}$$
 
 \section{Extraction of callsite-arguments}
 
@@ -1533,16 +1532,15 @@ Callsites within aggregate-functions are forbidden by the restriction that there
 
 \chapter{Optimizations}
 
-If certain characteristics of an UDF can be detected, the optimized translation templates can be chosen that exploits this characteristics. This may either improve performance or enables us to implement work-arounds for settings where the original templates are not applicable otherwise.
+If certain characteristics of the UDF are detected, optimized translation templates can be chosen that exploit those characteristics. This may either improve performance or enables us to implement work-arounds for settings where the original templates are not applicable otherwise.
 
-To make these optimizations no change in the scenario analysis is required. Instead, based on its output, ie. the generated scenarios, additionally analysis steps are performed to gather information required to choose the best templates.
-
-
+To make these optimizations no change in the scenario analysis is required. Instead, the scenarios of the UDF are tested for the properties and the results are included in the intermediate representation, so that the best template can be chosen.
 
 \section{Single Recursion}
 
 \begin{wrapfigure}{r}{0.2\textwidth}
-  \vspace{-20pt}\centering
+  \vspace{-10pt}
+  \centering
 \begin{tikzpicture}\small
 % nodes
 \node (f1) at (0, 2) {collatz(5)};
@@ -1561,7 +1559,8 @@ To make these optimizations no change in the scenario analysis is required. Inst
   \label{tr_callgraph}
 \end{wrapfigure}
 
-Single recursive functions have a linear branching behaviour (\autoref{tr_callgraph}). The function as a whole may contain multiple callsites as long as during evaluation each invocation will cause at most one recursive call. With the scenarios of the analysis, a single recursive function is quickly detected: If each scenario contains exactly one (or none) callsites, the function is single recursive.
+Single recursive functions are a subgroup of general recursive functions. They have a linear branching behaviour (\autoref{tr_callgraph}). The function as a whole may contain multiple callsites anyway, as long as each evaluation scenario contains only a single callsite. This is also the only criterion to detect single recursive functions.
+
 The function that computed the length of the \textit{collatz-series} (\autoref{lst:collatz_udf}) is an example for a single recursive function.
 
 \begin{figure}[h]
@@ -1592,7 +1591,7 @@ The function that computed the length of the \textit{collatz-series} (\autoref{l
     \label{collatz_sql_with_scenarios}
 \end{figure}
 
-The evaluation happens thus also in a strict linear manner. As each scenario depends only on the result of the previous result, the work-around (see \autoref{macro:evaluation_cte}) to access all previous computed results becomes unnecessary. In each iteration exactly one result is computed and in the next iteration the dependant scenario will be evaluated. No need to add all previous results to the current result to have those rows later available (\autoref{opt_sr_evaluation_cte}). This has the very nice effect, that the intermediate-table of the \texttt{evaluation}-CTE does not grow quadratic (see \autoref{}) but only linear. Only actually new rows are added to the results.
+The evaluation happens thus also in a strict linear manner. As each scenario depends only on the result of the previous result, the work-around (see \autoref{macro:evaluation_cte}) to access all previous computed results becomes unnecessary. In each iteration exactly one result is computed and in the next iteration the dependant scenario will be evaluated. No need to add all previous results to the current result to have those rows available later (\autoref{opt_sr_evaluation_cte}). Only actually new rows are added to the results.
 
 \begin{figure}[h!]
     \centering
@@ -1604,9 +1603,9 @@ WITH RECRUSIVE
         
         UNION ( -- was UNION ALL
             WITH e AS (TABLE evaluation)
-            (<evaluate recursive scenario_sr(scenario[1])>)
+            (<eval_recursive_scenario_sr(scenario[1])>)
                UNION ALL
-            (<evaluate recursive scenario_sr(scenario[2])>)
+            (<eval_recursive_scenario_sr(scenario[2])>)
         )
     )
 SELECT ...
@@ -1620,15 +1619,14 @@ Furthermore, the rather complicated relational division, pivoting and filtering 
 \begin{figure}[h!]
     \centering
     \sqlcode{snippets/opt_sr.sql}
-    \caption{Simplified macro for single recursive UDFs. Note how the \texttt{FROM}-clause is just a simple join and no \texttt{WHERE} is required anymore.}
+    \caption{Simplified template for single recursive UDFs. Note how the \texttt{FROM}-clause is just a simple join and no \texttt{WHERE} is required anymore.}
     \label{opt_sr_eval_scenario}
 \end{figure}
 
 
 
-
-
 \section{Tail Recursion}
+
 \begin{wrapfigure}{r}{0.5\textwidth}
   \vspace{-10pt}
     \sqlcode{snippets/collatz_tr.sql}
@@ -1638,7 +1636,7 @@ Furthermore, the rather complicated relational division, pivoting and filtering 
 
 A special form of single recursive functions are tail recursive functions. They do not have any evaluation context around any callsite so that each recursive scenario just returns another recursive call. Eventually, the result of the basecase is just passed all the way up in the callgraph to the root without any modifications. This last phase can therefore be skipped, which means that no \texttt{evaluation}-CTE is required.
 
-The final result is present in the \texttt{basecase}-CTE. The basecase-CTE contains only a single value because single recursive functions have no branches in the callgraph (cp. \autoref{tr_callgraph}). The modifications on the template amount to removing the \texttt{evaluation}-CTE and changing result selection as shown in \autoref{tr_opt_template}. Furthermore the \texttt{callsite\_id}-column can be removed from the \texttt{callgraph}-CTE because the only use of the \texttt{callsite\_id} is to identify the corresponding scenario during evaluation (\autoref{marco:collect_call_maybe_optimized}).
+The final result is present in the \texttt{basecase}-CTE. The basecase-CTE contains only a single value because single recursive functions have no branches in the callgraph (cp. \autoref{tr_callgraph}). The modifications on the template amount to removing the \texttt{evaluation}-CTE and changing result selection as shown in \autoref{tr_opt_template}. Furthermore the \texttt{callsite\_id}-column can be removed from the \texttt{callgraph}-CTE because the only use of the \texttt{callsite\_id} is to identify the corresponding scenario during evaluation, which is now omitted (\autoref{marco:collect_call_maybe_optimized}).
 
 \begin{figure}
     \centering
@@ -1649,8 +1647,8 @@ The final result is present in the \texttt{basecase}-CTE. The basecase-CTE conta
 
 
 \begin{figure}[h!]\centering\small
-    \begin{minted}{sql}
-    <collect_call_maybe(in_arg_1, predicate, callsite)>
+    \begin{minted}{postgresql}
+    <collect_call_maybe_tr(in_arg_1, predicate, callsite)>
         := SELECT
              in_arg_1                    AS in_1, 
            --callsite.id                 AS callsite_id,
@@ -1662,26 +1660,24 @@ The final result is present in the \texttt{basecase}-CTE. The basecase-CTE conta
   \label{marco:collect_call_maybe_optimized}
 \end{figure}
 
-The detection if tail recursive functions happens again by inspecting the generated scenarios. The only callsite \texttt{f(...} must be present at the top level of the query of every scenario or nested arbitrarily deep in trivial \texttt{SELECT}s.
-Nothing else may be present in the query as it would add a context that need to be saved and later on evaluated. Any computations like \texttt{1+(SELECT f(n))} would create a context around the call that need to be evaluated. The same for \FROM, even if the callsite-arguments contain no table-references, we are required to loop through the rows and create the output table.
+To test whether an UDF is tail recursive, all its scenarios must be tail recursive. This means that the context of the only callsite \texttt{f(...} must be present at the top level of the query or nested in trivial \texttt{SELECT}s. Any computations like \texttt{1+(SELECT f(n))} would create a computation context around the call that need to be evaluated.
+
 \begin{figure}
     \centering
 \begin{minted}{postgresql}
 q := f(...)
-q := (SELECT <c>)
+q := (SELECT <q>)
 q := (WITH [<alias> AS (<nonrecursive sql>), ...] <q>)
 \end{minted}
     \caption{Grammar for tail-recursive queries. This notion could be extended, but catches most cases as it is.}
     \label{tr_grammar}
 \end{figure}
 
-CTEs are the only exception. If one of the callsite arguments reference a CTE and therefore the query is preceded by a \WITH-block, the function is still considered tail recursive. Callsite-arguments are evaluated during callgraph discovery. During evaluation the callsites, including their arguments, are replaced by references to their results. So, during evaluation, the CTEs are present but not used and could be therefore discarded. The resulting query is eligible for the tail recursive optimization.
+CTEs can be included in the query, if they are only referenced from the callsite-arguments. Callsite-arguments are evaluated during callgraph creation. During evaluation, the callsites including their arguments are replaced by references to their results. So, CTEs are present but unused during evaluation. The resulting query is therefore eligible for the tail recursive optimization.
 
-\section{Constant parameter removal}
+\section{Constant argument removal}
 
-Unused parameters are always omitted.
-
-Sometimes arguments are passed to functions that are invariant in subsequent calls, eg. configuration parameters. As these parameters do not change, it is not necessary to include them in the callgraph-table or to include them when matching rows by arguments. The argument can just be left as it is in the translation, eg. as \texttt{\$1}.
+Some functions have arguments that are always just passed on to subsequent calls without modification, eg. configuration parameters. As these parameters do not change, it is not necessary to include them in the callgraph-table or to include them when matching rows by arguments. The argument can just be left as it is in the translation, eg. as \texttt{\$1}.
 
 \begin{wrapfigure}{r}{0.66\textwidth}
   \vspace{-10pt}
@@ -1690,9 +1686,9 @@ Sometimes arguments are passed to functions that are invariant in subsequent cal
   \label{lst:sieve_udf}
 \end{wrapfigure}
 
-Removing unnecessary comparisons speeds up the query and saves memory as the same value is not copied again and again. The speedup can be significant, eg. in the function \texttt{sieve} (\autoref{lst:sieve_udf}). The function implements the sieve of Erathostenes, which filters out all non-prime numbers from a number array.
+Omitting unnecessary arguments saves memory as well as CPU-time. The two tables \texttt{callgraph} and \texttt{evaluation} are joined in each iteration of the \texttt{evaluation}-CTE by the function arguments. Removing unnecessary comparisons speeds up the query and saves memory as the same value is not copied again and again.
 
-No change to the template is necessary and detection of constant arguments is straight-forward. The input is just removed from the list of arguments so that the argument is "not seen" when the templates are filled. The nth argument of a UDF is constant if the nth argument in each callsite is just \texttt{\$n}.
+No change to the template is necessary and detection of constant arguments is straight-forward: The nth argument of a UDF is constant if the nth argument in each callsite is just \texttt{\$n}. The argument is just removed from the list of arguments so that the argument is not considered when filling out templates.
 
 \begin{figure}[h]
     \centering\footnotesize
@@ -1705,8 +1701,8 @@ No change to the template is necessary and detection of constant arguments is st
     \end{tabular}
     \subcaption{\texttt{callgraph}-CTE for \texttt{sieve} without optimization}
     \label{}
-    \end{minipage}
-    \vspace{5mm}
+    \end{minipage}\par
+    \vspace*{15mm}
     \begin{minipage}[b]{\linewidth}
     \centering
     \begin{tabular}{c|c|c}
@@ -1724,41 +1720,6 @@ No change to the template is necessary and detection of constant arguments is st
 
 \begin{figure}[h]
     \centering
-    \begin{minipage}[b]{.45\linewidth}
-    \centering
-    \begin{minted}{postgresql}
-SELECT
-    c.out_1      AS in_1, 
-    c.out_2      AS in_2, 
-    1            AS callsite_id,
-    c.out_1 + 1  AS out_1
-    c.out_2      AS out_2
-FROM pred_1 AS p(is_true)
-WHERE p.is_true
-    \end{minted}
-    \subcaption{\texttt{collect\_call\_maybe} without optimization}
-    \label{}
-    \end{minipage}
-    \hfill
-    \begin{minipage}[b]{.45\linewidth}
-    \centering
-    \begin{minted}{postgresql}
-SELECT
-    c.out_1      AS in_1, 
-    1            AS callsite_id,
-    c.out_1 + 1  AS out_1
-FROM pred_1 AS p(is_true)
-WHERE p.is_true
-    \end{minted}
-    \subcaption{\texttt{collect\_call\_maybe} with constant parameter removed}
-    \label{}
-    \end{minipage}
-    \caption{Collection of a single scenario inside the \texttt{callgraph}-CTE.}
-    \label{}
-\end{figure}
-
-\begin{figure}
-    \centering
     \begin{minted}{postgresql}
 SELECT c.in_1                                  AS in_1, 
        (SELECT array_agg(T.v)
@@ -1768,13 +1729,43 @@ SELECT c.in_1                                  AS in_1,
 FROM calls_to_basecases c
 WHERE (SELECT (2 * c.out_1) > (array_length($2, 1))
     \end{minted}
-    \caption{Evaluation of a nonrecursive scenario of \texttt{sieve} inside the \texttt{basecases}-CTE with constant parameter removed: \texttt{\$2} is not replaced by \texttt{c.in\_2}.}
+    \caption{Evaluation of a nonrecursive scenario of \texttt{sieve} inside the \texttt{basecases}-CTE with constant argument removal. Note that \texttt{\$2} is not replaced by \texttt{c.in\_2}.}
     \label{fig:my_label}
 \end{figure}
 
 \section{Handling unhashable types}
-The limitation to require hashability on input arguments of the UDF can be lifted if we implement measures to work around this issues. This lead to a greater applicability but is not desirable in the general case where this costly workaround is not necessary.
 
+In some places within the templates we use the duplicate eliminating \texttt{UNION} which internally depends on the "equals" member of its B-tree operator class \cite[p. 1042 f.]{psql}. Equality can be determined either by sorting, which is used as first choice, or by hashing. Custom types uses the sorting operator of its components but lack a default hashing operator.
 
-Hashable arguments
-Hashable return value
+An undocumented quirk of PostgreSQL is that \texttt{UNION} within \texttt{WITH RECURSIVE} can just use hashing for duplicate elimination\footnote{see \url{https://www.postgresql-archive.org/Hashable-custom-types-td5801576.html}, last accessed at 29/12/2018}. Therefore an error \textit{all column datatype must be hashable} is thrown. This is undesireable, because our goal is that the translation should behave exactly like the original and raise no unexpected errors.
+
+A workaround is to cast unhashable types to \texttt{TEXT} when saving in a table and casting it back to the original type whenever using it. Unhashable types can occur in the arguments and in the return type.
+
+If the return type is not hashable, the result from each evaluated scenario must be casted to \texttt{TEXT} before storing into \texttt{basecases} resp. \texttt{evaluation}. When replacing the result of a callsite with an reference to \texttt{evaluation}, it must be casted back to the original type. Within the final result selection the result must be also casted back to the original type.
+
+Hashable arguments must be casted to \texttt{TEXT} when creating the \texttt{callgraph}. To evaluate the callsite-arguments, the reference to the \texttt{out}-columns must be casted back to the original type. The same is required when replacing arguments during scenario-evaluation.
+
+Unhashable types are detected by introspecting PostgreSQL (\autoref{sql:hashable_query}). This makes the translation aware of custom hash-operators. PostgreSQL has some type-aliases defined, eg. \texttt{smallint} is an alias for \texttt{int2}. The first is returned by \texttt{t.oid :: regtype} and the latter by \textit{t.typename}.
+
+\begin{figure}
+    \centering
+\begin{minted}{postgresql}
+SELECT t.typname :: TEXT 
+FROM pg_operator as o, pg_type as t 
+WHERE o.oprleft = t.oid 
+  AND o.oprright = t.oid 
+  AND o.oprname = '=' 
+  AND o.oprcanhash 
+
+UNION
+
+SELECT t.oid :: regtype  :: TEXT 
+FROM   pg_operator as o, pg_type as t 
+WHERE o.oprleft = t.oid 
+  AND o.oprright = t.oid 
+  AND o.oprname = '=' 
+  AND o.oprcanhash;
+\end{minted}
+    \caption{Query to obtain all type-aliases from a PostgreSQL-instance that have an operator defined that can be used for hashing.}
+    \label{sql:hashable_query}
+\end{figure}

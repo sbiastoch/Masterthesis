@@ -23,3 +23,21 @@ https://docs.google.com/document/d/1mL0pJHE5w3o3rmQ7ddxxZrgUCxyxPdn0VJokh_L4egw/
 http://siek.blogspot.com/2012/07/crash-course-on-notation-in-programming.html
 
 https://rjlipton.wordpress.com/2009/07/24/how-to-avoid-o-abuse-and-bribes/
+
+
+
+
+Dynamic Programming/Tabulation: Bottom Up
+Memoization: Top down
+Incrementalization: Deltas
+
+"Incrementalization: From Clarity to Efficiency": Overview
+"Program optimization using index and recursive data structures"
+
+
+"A transformation system for developing recursive programs." => eureka function
+
+Recursion => Iteration
+
+“Memo” functions and machine learning => Memozation
+

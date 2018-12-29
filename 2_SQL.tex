@@ -157,3 +157,14 @@ For \texttt{UNION ALL} the set semantics need to be replaced with bag semantics 
 Beside the special structure of a RCTE, they come with two important restrictions. First, only a single (direct) self-reference is allowed in the self-referential query. A simple workaround is to use a CTE that "proxies" access, so this limitation is not severe.
 
 More notably is that only the previous iteration can be referenced. This is a strong limitation as this allows only the convenient formulation of linear recursive functions. In linear recursion a single recursive call leads to a single subsequent call. To evaluate a call, only the result of the previous call is therefore required. The usual workaround is to use \texttt{UNION ALL} semantics to allow duplicates and to add the previous result to the new results. The obvious caveat of this solution is that the resulting table becomes large quickly. After $n$ iterations, the results from the first iteration is contained $n$ times, results from second iteration $n-1$ times and so on. The result table grows quadratically. Furthermore, there must be taken care of including a stopping criterion to eventually prevent include the previous rows again and instead return the empty table.
+
+
+\section{Related Work}
+
+Transforming a textbook-style recursive algorithm into a more time/space efficient version has been the subject of research for a long time. One field of research is the transformation of recursive functions into an iterative form, ie. replacing recursion with loops (\cite{}).
+
+Another approach targets a special kind of recursive algorithms that have overlapping subproblems, ie. redundant calls. Dynamic Programming (DP) is a popular implementation technique to eliminate redundant computations. It is applicable if a problem has the "optimal subproblem" propertie: An optimal solution contains only optimal sub-solutions. The algorithm is then formulated in a way that construct bottom-up optimal solutions first and extends this solution successivly. Optimal solutions to subproblems are usually stored in a table-like datastructure. \cite{}
+
+Incrementalization is an approach to systematically derive a DP-version from a recursivly stated algorithm. The idea is to find the minimal increment by inverting the minimal decrement found in the function. The difficulty is to find the inverse of the increment-function which generally requires the use of some "eureka-function", ie. manual assistance. This makes it hard to fully automate this approach.
+
+Closely related to DP is Memoization. While DP requires to state the problem in an bottom-up, "DP-way" fashion, Memoization can be implemented less invasiv. The top-down recursive structure remains unchanged, only the recursive function is replaced with a "memo" function. The memo-function saves each value it has computed. Before a recursive call is made, the program checks whether it can return the value saved for this call.

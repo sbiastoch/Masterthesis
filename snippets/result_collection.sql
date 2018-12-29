@@ -7,6 +7,6 @@ WITH RECURSIVE
    )
 SELECT
   COALESCE(
-    (SELECT e.res FROM evaluation e WHERE e.in_1 IS NOT DISTINCT FROM $1),
-    (SELECT DISTINCT NULL::NUMERIC FROM loop)
+    (SELECT e.res FROM evaluation e WHERE (e.in_1) = ($1)),
+    (SELECT DISTINCT NULL::<return type> FROM loop)
   )
