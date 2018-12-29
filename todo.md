@@ -1,6 +1,6 @@
-writing:
 - Related Work
 - Layout
+- update argument extraction for CTEs
 
 must haves:
 - intermediate representation, inkl. args?
