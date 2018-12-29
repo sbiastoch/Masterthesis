@@ -161,10 +161,20 @@ More notably is that only the previous iteration can be referenced. This is a st
 
 \section{Related Work}
 
-Transforming a textbook-style recursive algorithm into a more time/space efficient version has been the subject of research for a long time. One field of research is the transformation of recursive functions into an iterative form, ie. replacing recursion with loops (\cite{}).
+Performing computations close to the data within the DBMS is favorable especially in situations where the data does not fit into main memory. In particular, computations for statistical and machine learning applications can profit from the scalability of RDBMs \cite{SQLforML,PCAinSQL,MLwithUDFs,MLinSQL2}.
+
+Transforming a textbook-style recursive algorithm into a more time/space efficient version has been subject of research for a long time. One field of research is the transformation of recursive functions into an iterative form, ie. replacing recursion with loops (\cite{unrollingRCTEs}).
 
 Another approach targets a special kind of recursive algorithms that have overlapping subproblems, ie. redundant calls. Dynamic Programming (DP) is a popular implementation technique to eliminate redundant computations. It is applicable if a problem has the "optimal subproblem" propertie: An optimal solution contains only optimal sub-solutions. The algorithm is then formulated in a way that construct bottom-up optimal solutions first and extends this solution successivly. Optimal solutions to subproblems are usually stored in a table-like datastructure. \cite{}
 
 Incrementalization is an approach to systematically derive a DP-version from a recursivly stated algorithm. The idea is to find the minimal increment by inverting the minimal decrement found in the function. The difficulty is to find the inverse of the increment-function which generally requires the use of some "eureka-function", ie. manual assistance. This makes it hard to fully automate this approach.
 
-Closely related to DP is Memoization. While DP requires to state the problem in an bottom-up, "DP-way" fashion, Memoization can be implemented less invasiv. The top-down recursive structure remains unchanged, only the recursive function is replaced with a "memo" function. The memo-function saves each value it has computed. Before a recursive call is made, the program checks whether it can return the value saved for this call.
+Closely related to DP is Memoization \cite{memo}. While DP requires to state the problem in an bottom-up, "DP-way" fashion, Memoization can be implemented less invasiv. The top-down recursive structure remains unchanged, only the recursive function is replaced with a "memo" function. The memo-function saves each value it has computed. Before a recursive call is made, the program checks whether it can return the value saved for this call.
+
+
+\cite{optimizingRecursiveQueries} optimized recursive views by
+
+
+
+\cite{denis_hirn}, \cite{peter_richter}
+\cite{extendingRecursionInSQL}

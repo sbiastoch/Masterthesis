@@ -1,7 +1,6 @@
 writing:
 - Related Work
 - Layout
-- - mention distinct from in fib
 
 must haves:
 - intermediate representation, inkl. args?

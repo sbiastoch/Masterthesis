@@ -11,12 +11,16 @@
 %    What is the problem?
 %    Why is it interesting and important?
 
-\paragraph*{Motivation} Recursion is concise and easy to understand and write, since it resembles our inductive way of thinking about recursive tasks. We start from a nonrecursive basecase and then construct the recursive cases. Evaluation happens by stacking up recursive calls until basecases are reached and first result can be assemble from them.
+\paragraph*{Motivation} Recursion is concise and easy to understand and write, since it resembles our inductive way of thinking about recursive tasks. We start from a nonrecursive basecase and then construct the recursive cases. Evaluation happens by stacking up recursive calls until a basecase is reached and the callstack can be evaluated.
 
 The problem with recursion in general is that it comes with a large overhead. Each call that waits on the result of other function calls is "paused" and the state of execution is pushed to the callstack. This is very expensive in terms of time and memory. All variables, returning addresses etc. need to be copied to the stack when switching the context, and restored when popping the layer. For SQL-UDFs, each call comes with especially large overhead because the UDF-body of every function is planned and the plan needs to be saved until the call returns. Therefore, recursive procedures in SQL are very slow and the limited stack size is quickly exceeded.
 
 %    Why is it hard? (E.g., why do naive approaches fail?)
-Iterative solutions with dynamic programming are usually the way to go where recursion is impractical. By iteratively manipulating variables inside the heap memory, much overhead from the recursion can be avoided. Additionally, computation is not restricted by stack depth (megabytes) but by heap sizes (gigbytes). Dynamic Programming aims to avoid redundant recursive calls by saving results of subproblems in a table. Translating a declarative but inefficient algorithm into an imperative language like Java and implementing dynamic programming can be challenging. If you can exploit specific mathematical properties of the problem to constraint the search space, you may come up with a very efficient solution. But this is a time consuming task and developer time is always a very limited resource.
+Iterative solutions with dynamic programming are usually the way to go where recursion is impractical. By iteratively manipulating variables inside the heap memory, overhead from the recursion can be avoided. Additionally, computation is not restricted by stack depth (megabytes) but by heap sizes (gigbytes).
+
+Dynamic Programming \cite{DP_Bellman} aims to avoid redundant recursive calls by saving results of subproblems in a table. Translating a declarative but inefficient algorithm into an imperative language like Java and implementing dynamic programming can be challenging. If you can exploit specific mathematical properties of the problem to constraint the search space, you may come up with a very efficient solution.
+
+In practice, the effort to come up with an near optimal solution is not worth all the effort when a "good enough"-solution would also fit the use-case. Furthermore, the maintainability and portability of a short and simple, declarative piece of code is much higher than the optimized version, that exploits subtle properties of the problem, the database-system or uses other nifty tweaks.
 
 If your target language is not an imperative language but a declarative SQL-query, implementation is less straight forward. You will additionally need a decent amount of knowledge of SQL, the query planner and probably other internals of the database system to avoid all the pitfalls that can slow down your query. Additionally, you sacrifice much readability for performance, obfuscating the logical level with implementation details. This makes the query less maintainable and more error prone.
 
@@ -26,7 +30,7 @@ Our approach fully automatizes the optimization process so that the programmer c
 \paragraph*{Example}
 
 % fib example
-As example, let us comprehend how the Fibonacci function is translated. It is defined as $F_n = F_{n-1} + F_{n-2}$ with $F_0 = 0$ and $F_1 = 1$ \cite[p. 79]{TAOCP_Knuth}. For this example we will use the (slightly awkward) formulation from figure \autoref{intro_fib}. We require that all case-distinctions in the query are made by an explicit \texttt{CASE}-expression.
+As example, let us comprehend how the Fibonacci function is translated. It is defined as $F_n = F_{n-1} + F_{n-2}$ with $F_0 = 0$ and $F_1 = 1$ \cite[p. 79]{TAOCP_Knuth}. For this example we will use the (slightly awkward) formulation from figure \autoref{intro_fib}.
 
 \begin{figure}[h]\small
     \begin{minipage}[b]{.47\linewidth}
@@ -42,7 +46,7 @@ As example, let us comprehend how the Fibonacci function is translated. It is de
 \end{figure}
 
 % Recursive evaluation in SQL
-What happens if we call \mintinline{postgresql}{SELECT fib(4)}? The planner takes some time to have a close look at the query inside fib to make an execution plan and then executes this plan. During execution, a number of subcalls occurs that need to be executed before the surrounding query can be evaluated. Everytime, the UDF is replanned and a callstack will grow as illustrated in \autoref{fib_4_callstack}. As soon as a node has the result of all of its children, the node can itself return a result. The leaves of the tree can therefore return a result immediately and the evaluation starts bottom-up (\autoref{fib_4_callstack_evaluation}). 
+What happens if we call \mintinline{postgresql}{SELECT fib(4)}? The planner takes some time to have a close look at the query inside \texttt{fib} to consider all possible plans and then executes the cheapest plan. During execution, a number of subcalls occurs that need to be executed before the surrounding query can be evaluated, the calls stack up as illustrated in \autoref{fib_4_callstack}. As soon as a node has the result of all of its children, the node can itself return a result. The leaves of the tree can therefore return a result immediately and the evaluation starts bottom-up (\autoref{fib_4_callstack_evaluation}). 
 
 
 \begin{figure}[h!]
@@ -63,11 +67,11 @@ What happens if we call \mintinline{postgresql}{SELECT fib(4)}? The planner take
 \end{figure}
 
 
-\begin{wrapfigure}{r}{0.4\linewidth}
+\begin{figure}[h]
 \centering
 \input{snippets/tbl_callgraph.tex}
 \caption{}\label{tbl:callgraph}
-\end{wrapfigure}
+\end{figure}
 
 % Callgraph creation
 The idea behind the translation is to simulate this two phases: top-down callstack-growth and bottom-up evaluation. The callstack is created by evaluating only the parts of the UDF that are necessary to observe subsequent recursive calls. First, this are the predicates of the \texttt{CASE}-expression. They are required to detect which callsites are actually called with the given UDF-arguments. Second, the arguments of these callsites need to be evaluated to find out the input-arguments for the subsequent calls. This way, the callstack is built until all callsites lead to basecases. By collecting only unique rows, it is actually not a callstack but a \textit{callgraph} that we create as it contains no duplicate calls.

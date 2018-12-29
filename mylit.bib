@@ -46,7 +46,7 @@ year = 2018
  
 % Volcano iterator model
 @article{volcano,
-  author    = {Goetz Graefe},
+  author    = {Graefe, Goetz},
   title     = {Volcano - An Extensible and Parallel Query Evaluation System},
   journal   = {{IEEE} Trans. Knowl. Data Eng.},
   volume    = {6},
@@ -62,7 +62,7 @@ year = 2018
 
 % Oldschool Database standard textbook
 @book{ullman,
-  Author = {Jeffrey D. Ullman},
+  Author = {Ullman, Jeffrey D.},
   Title = {Principles of Database \& Knowledge-Base Systems, Vol. 1: Classical Database Systems},
   Publisher = {Computer Science Press},
   Year = {1988},
@@ -71,7 +71,7 @@ year = 2018
 
 % Logparser
 @mastersthesis{peter_richter,
-  author       = {Peter Richter}, 
+  author       = {Richter, Peter}, 
   title        = {Extract and Sanitize PostgreSQL Query Parse Trees},
   school       = {{Eberhard Karls Universität Tübingen}},
   year         = 2015,
@@ -82,7 +82,7 @@ year = 2018
 
 % Pretty printer
 @mastersthesis{denis_hirn,
-  author       = {Denis Hirn}, 
+  author       = {Hirn, Denis}, 
   title        = {Compilation of SQL into KL},
   school       = {{Eberhard Karls Universität Tübingen}},
   year         = 2017,
@@ -220,4 +220,103 @@ year = 2018
   author={Nielson, Hanne Riis and Nielson, Flemming},
   volume={104},
   publisher={Springer}
+}
+@inproceedings{optimizingRecursiveQueries,
+  title={Optimizing recursive queries in SQL},
+  author={Ordonez, Carlos},
+  booktitle={SIGMOD Conference},
+  year={2005}
+}
+
+@article{incrementalization,
+author = {Liu, Yanhong and Stoller, Scott},
+year = {2001},
+month = {12},
+pages = {},
+title = {Program Optimization Using Indexed and Recursive Data Structures},
+journal = {Proceedings of the ACM SIGPLAN Symposium on Partial Evaluation and Semantics-Based Program Manipulation},
+doi = {10.1145/503032.503041}
+}
+
+@article{unrollingRCTEs,
+author = {Boniewicz, Aleksandra and Stencel, Krzysztof and Wiśniewski, Piotr},
+year = {2012},
+month = {01},
+pages = {345-354},
+title = {Unrolling SQL: 1999 Recursive queries},
+volume = {352},
+journal = {Communications in Computer and Information Science},
+doi = {10.1007/978-3-642-35603-2_50}
+}
+
+@inproceedings{extendingRecursionInSQL,
+  title={Formalizing a Broader Recursion Coverage in SQL},
+  author={Gabriel Aranda-L{\'o}pez and Susana Nieva and Fernando S{\'a}enz-P{\'e}rez and Jaime S{\'a}nchez-Hern{\'a}ndez},
+  booktitle={PADL},
+  year={2013}
+}
+
+@inproceedings{SQLforML,
+  title={On the Efficient Gathering of Sufficient Statistics for Classification from Large SQL Databases},
+  author={Goetz Graefe and Usama M. Fayyad and Surajit Chaudhuri},
+  booktitle={KDD},
+  year={1998}
+}
+
+@inproceedings{PCAinSQL,
+ author = {Navas, Mario and Ordonez, Carlos},
+ title = {Efficient Computation of PCA with SVD in SQL},
+ booktitle = {Proceedings of the 2Nd Workshop on Data Mining Using Matrices and Tensors},
+ series = {DMMT '09},
+ year = {2009},
+ isbn = {978-1-60558-673-1},
+ location = {Paris, France},
+ pages = {5:1--5:10},
+ articleno = {5},
+ numpages = {10},
+ url = {http://doi.acm.org/10.1145/1581114.1581119},
+ doi = {10.1145/1581114.1581119},
+ acmid = {1581119},
+ publisher = {ACM},
+ address = {New York, NY, USA},
+ keywords = {DBMS, PCA, SQL, SVD},
+}
+
+@article{MLwithUDFs,
+ author = {Ordonez, Carlos},
+ title = {Statistical Model Computation with UDFs},
+ journal = {IEEE Trans. on Knowl. and Data Eng.},
+ issue_date = {December 2010},
+ volume = {22},
+ number = {12},
+ month = dec,
+ year = {2010},
+ issn = {1041-4347},
+ pages = {1752--1765},
+ numpages = {14},
+ url = {http://dx.doi.org/10.1109/TKDE.2010.44},
+ doi = {10.1109/TKDE.2010.44},
+ acmid = {1908024},
+ publisher = {IEEE Educational Activities Department},
+ address = {Piscataway, NJ, USA},
+ keywords = {DBMS, DBMS, SQL, statistical model, UDF., SQL, UDF., statistical model},
+}
+
+@inproceedings{MLinSQL2,
+author = {Ordonez, Carlos and Garcia-Alvarado, Carlos},
+year = {2011},
+month = {10},
+pages = {2521-2524},
+title = {A data mining system based on SQL queries and UDFs for relational databases},
+journal = {International Conference on Information and Knowledge Management, Proceedings},
+doi = {10.1145/2063576.2064008}
+}
+
+@inproceedings{RCTEpredicatePushdown,
+  title={On Impossibility of Decremental Recomputation of Recursive Queries in Relational Calculus and SQL.},
+  author={Dong, Guozhu and Libkin, Leonid and Wong, Limsoon},
+  booktitle={DBPL},
+  volume={95},
+  pages={8},
+  year={1995}
 }
