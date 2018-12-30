@@ -1,4 +1,4 @@
-\begin{lstlisting}[language={},basicstyle=\scriptsize]
+\begin{lstlisting}[basicstyle=\ttfamily\scriptsize]
 ### Analysis result: ###
 Name:              pg_proc.case_plus_case
 Return type:       TAtom "numeric" [$\checkmark$ hashable]
@@ -34,7 +34,7 @@ Recursive Scenarios:
      Predicate:
         SELECT $\udfArg{1}$ < 1 AND (NOT $\udfArg{1}$ < 3 AND NOT $\udfArg{1}$ < 4)) 
      Query:
-        SELECT 1 + (1 - (case_plus_case($\udfArg{1}$ - 3)))
+        SELECT 1 + (1 - case_plus_case($\udfArg{1}$ - 3))
 
   3) Callsites: 3
      Predicate:
@@ -46,13 +46,13 @@ Recursive Scenarios:
      Predicate:
         SELECT NOT $\udfArg{1}$ < 1 AND (NOT $\udfArg{1}$ < 3 AND $\udfArg{1}$ < 4) 
      Query:
-        SELECT case_plus_case($\udfArg{1}$ - 1) + (case_plus_case($\udfArg{1}$ - 2))
+        SELECT case_plus_case($\udfArg{1}$ - 1) + case_plus_case($\udfArg{1}$ - 2)
 
   5) Callsites: 6, 7
      Predicate:
         SELECT NOT $\udfArg{1}$ < 1 AND (NOT $\udfArg{1}$ < 3 AND NOT $\udfArg{1}$ < 4)
      Query:
-        SELECT case_plus_case($\udfArg{1}$ - 1) + (1 - (case_plus_case($\udfArg{1}$ - 3))
+        SELECT case_plus_case($\udfArg{1}$ - 1) + (1 - case_plus_case($\udfArg{1}$ - 3)
 
 Basecase Scenarios:
   1) Predicate:

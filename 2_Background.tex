@@ -79,12 +79,12 @@ Eventually, the \textit{executor} recursively executes each node of the plan jus
 
 Recursion is a fundamental concept in everyday programming as well as in computability-theory. Every recursive function consists of a number of different \textit{evaluation scenarios}. Some of them cause subsequent recursive calls (\textit{recursive scenarios}) and at least one scenario causes no recursive calls at all (\textit{nonrecursive} or \texttt{basecase scenario}). Otherwise, the function would never terminate.
 
-The programmer usually uses conditionals to direct which scenario should be evaluated. For this thesis, I assume that conditionals are given in the form of \texttt{CASE}-expressions only, so that a \textit{predicate} is stated explicitly for each scenario. One of the main task of the translation will be to collect the scenarios and identify their predicates.
+The programmer usually uses conditionals to direct which scenario should be evaluated. For this thesis I assume conditionals to be given in the form of \texttt{CASE}-expressions only, so that a \textit{predicate} is stated explicitly for each scenario. One of the main tasks of the translation will be to collect the scenarios and identify their predicates.
 
-Recursive functions can be implemented in SQL in two ways: As User Defined Function (UDF) or as self-referential Common Table Expression (CTE) in \texttt{WITH RECURSIVE}-queries. UDFs are functions (actually procedures) as we know them: A function with a name, an argument list, a defined return type and a function body. Recursive CTEs are different, as they are no procedures with explicit arguments but self-referential queries of a specific structure.
+Recursive functions can be implemented in SQL in two ways: As a User Defined Function (UDF) or as a self-referential Common Table Expression (CTE) in \texttt{WITH RECURSIVE}-queries. UDFs are functions (actually procedures) as we know them: A function with a name, an argument list, a defined return type and a function body. Recursive CTEs are different as they are no procedures with explicit arguments but self-referential queries of a specific structure.
 
 \subsection{Recursive User Defined Functions}
-Recursive functions can be created in PostgreSQL as UDFs. UDFs can be implemented in a wide range of languages but we consider only SQL-UDFs as we do not want to leave the SQL-world. PostgreSQL provides a number of different ways to specify arguments and add modifiers. For my thesis I just assume simple positional arguments without any modifiers (eg. \texttt{\$1}).
+Recursive functions can be created in PostgreSQL as UDFs. UDFs can be implemented in a wide range of languages but we consider only SQL-UDFs as we do not want to leave the SQL-world. PostgreSQL provides a number of different ways to specify arguments and add modifiers. For my thesis I assume just simple positional arguments without any modifiers (eg. \texttt{\$1}).
 
 \begin{figure}[h!]
     \centering
@@ -103,7 +103,7 @@ SELECT fac(10);
 
 UDFs are mostly a black box for the query planner. They have just a fixed cost assigned as a whole (default 1000 \cite[p. 1435]{psql}) and the body of every call is planned before execution.
 
-Under certain circumstances, PostgreSQL can optimize some function calls. Very simple functions can be inlined during planning \cite{psqlWikiUDFinlining} (see \autoref{fig:inlining}), but this is done only once, so its impact for recursive functions is not a game-changer.
+Under certain circumstances, PostgreSQL can optimize some function calls. Very simple functions can be inlined during planning \cite{psqlWikiUDFinlining} (see \autoref{fig:inlining}), but this is done only once thus its impact for recursive functions is not a game-changer.
 
 
 \begin{figure}[h!]
@@ -123,11 +123,11 @@ Identical calls to a function marked as \texttt{IMMUTABLE} can be folded into a 
 \begin{minted}{postgresql}
 SELECT * FROM T WHERE T.v IS BETWEEN fac(99) AND fac(100);
 \end{minted}
-Instead of evaluating \texttt{fac(99)} and \texttt{fac(100)} exactly $|T|$ times, the planner may be able to evaluate those functions once and replace the values in the where-clause with the values obtained before. For recursive SQL-UDFs this happens as well, but isolated for each invocation of an UDF. There is nothing folded into constants across levels of recursion.
+Instead of evaluating \texttt{fac(99)} and \texttt{fac(100)} exactly $|T|$ times the planner may be able to evaluate those functions once and replace the values in the where-clause with the values obtained before. For recursive SQL-UDFs this happens as well, but isolated for each invocation of an UDF. There is nothing folded into constants across levels of recursion.
 
 \subsection{Recursive Common Table Expressions}
 
-Common Table Expressions (CTEs) are a convenient way to define auxiliary queries once in advance to use them similar to temporary tables in the contained query. CTEs help breaking a big query down into smaller individual parts. CTEs are only evaluated once, which can improve performance. On the other hand, CTEs are known to be "optimization fences" as the planner does not perform predicate pushdown into CTEs.
+Common Table Expressions (CTEs) are a convenient way to define auxiliary queries once in advance to use them similar to temporary tables in the contained query. CTEs help breaking a big query down into smaller individual parts. CTEs are only evaluated once which can improve performance. On the other hand, CTEs are known to be "optimization fences" as the planner does not perform predicate pushdown into CTEs.
 
 
 \begin{figure}[h!]
@@ -145,11 +145,11 @@ SELECT v FROM T WHERE i = 10;
 \end{figure}
 
 
-CTEs also exist in a "recursive" variant, which makes SQL queries much more expressive. Actually, since the introduction of recursive CTEs in SQL:1999, queries are turing-complete. Every intuitively computable function can expressed as a SQL-query. PostgreSQL supports this feature since Version 8.4 (2009) \cite[p. 2811]{psql}. Implementations in PostgreSQL for turing-machines and cyclic tag systems exist, demonstrating this property \cite{psqlWikiCTS, psqlWikiTM}.
+CTEs also exist in a "recursive" variant which makes SQL queries much more expressive. Actually, since the introduction of recursive CTEs in SQL:1999, queries are turing-complete. Every intuitively computable function can be expressed as a SQL-query. PostgreSQL supports this feature since Version 8.4 (2009) \cite[p. 2811]{psql}. Implementations in PostgreSQL for turing-machines and cyclic tag systems exist demonstrating this property \cite{psqlWikiCTS, psqlWikiTM}.
 
-However, recursive functions need to be implemented in a special style using self-referential CTEs inside \texttt{WITH RECURSIVE}-queries. This constraints origin by the fact that they are actually evaluated iterativly. Each self-referential CTE consist of a \texttt{UNION} or \texttt{UNION ALL} that divides the starting query from the "recursive" query. The recursive query contains a reference to the CTE itself. Evaluation happens in a iterative fashion: In each iteration the self-reference points to a \textit{working table} containing the results from the previous iteration. When using the variant with \texttt{UNION}, each iteration returns only (globally) new rows. The rows from each iteration is added to the result of the CTE.
+However, recursive functions need to be implemented in a special style using self-referential CTEs inside \texttt{WITH RECURSIVE}-queries. This constraints origin by the fact that they are actually evaluated iteratively. Each self-referential CTE consist of a \texttt{UNION} or \texttt{UNION ALL} dividing the starting query from the "recursive" query. The recursive query contains a reference to the CTE itself. Evaluation happens in a iterative fashion: In each iteration the self-reference points to a \textit{working table} containing the results from the previous iteration. When using the variant with \texttt{UNION} each iteration returns only (globally) new rows. The rows of each iteration are added to the result of the CTE.
 
-As soon as the working table is empty, evaluation stops. In the case of \texttt{UNION ALL} this happens only when an iteration returns the empty table. Using \texttt{UNION}, it stops when the iteration returns no previously unseen rows. Self-referential CTEs resembles therefore a while loop.
+As soon as the working table is empty the evaluation stops. In the case of \texttt{UNION ALL} this happens only when an iteration returns the empty table. Using \texttt{UNION} it stops as soon as the iteration returns no previously unseen rows. Self-referential CTEs therefore resemble a while loop.
 
 The semantics of a self-referential CTE using \texttt{UNION} can be summarized as follows:
 
@@ -159,23 +159,23 @@ $$
 
 For \texttt{UNION ALL} the set semantics is replaced with bag semantics to allow duplicates.
 
-Beside the special structure of a self-referential CTE, they come with two important restrictions. First, only a single (direct) self-reference is allowed in the self-referential query. A simple workaround is to use a CTE that "proxies" access, so this limitation is not severe.
+Besides the special structure of a self-referential CTE it comes with two important restrictions. First, only a single (direct) self-reference is allowed in the self-referential query. A simple workaround is to use a CTE that "proxies" access thus this limitation is not severe.
 
-More notably is that only the previous iteration can be referenced. This is a strong limitation as this allows only the convenient formulation of linear recursive functions. In linear recursion a single recursive call leads to a single subsequent call. To evaluate a call, only the result of the previous call is therefore required. The usual workaround is to use \texttt{UNION ALL} to allow duplicates and to add the previous result to the new results. The obvious caveat of this solution is that the resulting table becomes large quickly. After $n$ iterations, the results from the first iteration is included $n$ times, results from second iteration $n-1$ times and so on. The result table grows quadratically. Furthermore, there must be taken care of including a stopping criterion to eventually prevent include the previous rows again and instead return the empty table.
+More notably, only the previous iteration can be referenced. This is a strong limitation as this allows only the convenient formulation of linear recursive functions. In linear recursion a single recursive call leads to a single subsequent call. To evaluate a call only the result of the previous call is therefore required. The usual workaround is to use \texttt{UNION ALL} to allow duplicates and to add the previous result to the new results. The obvious drawback from this solution is the resulting table becoming large quickly. After $n$ iterations the results from the first iteration are included $n$ times, results from the second iteration $n-1$ times and so on. The result table grows quadratically. Furthermore, one has to take care to include a stopping criterion to eventually prevent the inclusion of the previous rows again and instead return the empty table.
 
 
 
 \section{Related Work}
 %The trade-off between readability and performance
 
-The transformation of inefficient recursive algorithms into more time/space efficient iterative version has been subject of research for a long time and different solutions have been developed \cite{redundantRecRemoval, transformingRecProgs, recursionRemoval, changeEvalOrder, programTransformation}.
+The transformation of inefficient recursive algorithms into more time/space efficient iterative versions has been subject of research for a long time and different solutions have been developed \cite{redundantRecRemoval, transformingRecProgs, recursionRemoval, changeEvalOrder, programTransformation}.
 
-A widely known approach is Dynamic Programming (DP) \cite{DP_Bellman}. DP is an implementation technique to optimize problems with overlapping subproblems by avoiding redundant calls. It is applicable if a problem has the "optimal subproblem" property: An optimal solution contains only optimal sub-solutions. The algorithm is then formulated in a way to construct bottom-up optimal solutions first and extend this solution successively. Optimal solutions to subproblems are usually stored in a table-like data-structure. \cite[p. 363 ff.]{Cormen}
+A widely known approach is Dynamic Programming (DP) \cite{DP_Bellman}. DP is an implementation technique to optimize problems with overlapping subproblems by avoiding redundant calls. It is applicable if a problem has the "optimal subproblem" property: An optimal solution contains only optimal sub-solutions. The algorithm is then formulated in a way to construct bottom-up optimal solutions first and extend these solutions successively. Optimal solutions to subproblems are usually stored in a table-like data-structure. \cite[p. 363 ff.]{Cormen}
 
 Incrementalization is an approach to systematically derive a DP-version from a recursively stated algorithm. The idea is to find the minimal increment by inverting the minimal decrement found in the function. The difficulty is to find the inverse of the increment-function which generally requires the use of some "eureka-function", ie. manual assistance. This makes it hard to fully automate this approach. \cite{incrementalization}
 
-Closely related to DP is Memoization \cite{memo} which we also apply in our approach. While DP requires to state the problem in an bottom-up, "DP-way" fashion, Memoization can be implemented less invasive. The top-down recursive structure remains unchanged, only the recursive function is replaced with a "memo" function. The memo-function saves each value it has computed. Before a recursive call is made, the program checks whether there is a saved value for a call with this arguments. For pure function like in Lisp, this can even happen at a language-level \cite{norvig_memoization}. \cite[p. 390 ff.]{Cormen}
+Closely related to DP is Memoization \cite{memo} which we also apply in our approach. While DP requires to state the problem in a bottom-up, "DP-way" fashion, Memoization can be implemented less invasive. The top-down recursive structure remains unchanged, only the recursive function is replaced with a "memo" function. The memo-function saves each value it has computed. Before a recursive call is made the program checks whether there is a saved value for a call with these arguments. For pure functions like in Lisp this can even happen at a language-level \cite{norvig_memoization}. \cite[p. 390 ff.]{Cormen}
 
 Performing computations close to the data within a RDBMS is favorable especially in situations where the data does not fit into main memory. In particular, computations for statistical and machine learning applications can profit from the scalability of RDBMSs \cite{SQLforML,PCAinSQL,MLwithUDFs,MLinSQL2,decisionTables}.
 
-Recursion in SQL has been studied mostly on a language level. Different approaches exist to improve the performance or capabilities of self-referential queries \cite{LRoptimizations, optimizingRecursiveQueries, extendingRecursionInSQL, RCTEplanningOptimization}. Recursive UDFs (in other RDBMS known as \textit{Stored Procedures}) seem to be a sparsely studied topic, maybe because implementations of recursive SQL has became widely available just in the last couple years \cite{RSQLsurvey} and recursive UDFs are no explicit part of the SQL standard.
+Recursion in SQL has been studied mostly on a language level. Different approaches exist to improve the performance or capabilities of self-referential queries \cite{LRoptimizations, optimizingRecursiveQueries, extendingRecursionInSQL, RCTEplanningOptimization}. Recursive UDFs (in other RDBMS known as \textit{Stored Procedures}) seem to be a sparsely studied topic. This may be due to implementations of recursive SQL only becoming widely available in the last couple of years \cite{RSQLsurvey} and recursive UDFs being no explicit part of the SQL standard.

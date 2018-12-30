@@ -298,7 +298,7 @@ With this problem solved, evaluating a recursive scenario boiles down to replaci
 
 The working-table in recursive CTEs contains only the rows from the previous iteration which is a problem when evaluating. Take the evaluation of \texttt{fib} for example (see \autoref{fig:fib_callstack_graph}): Each recursive scenario depends on the results of the last (\texttt{fib(n-1)}) and the penultimate iteration (\texttt{fib(n-2)}). Standard recursive CTE-semantics allows only access to \texttt{fib(n-1)}.
 
-To work around this restriction, the working table is added to the actual result-rows in each iteration. If we choose this approach the working-table will never be empty, consequently evaluation would never end. Therefore we need to manually take care of returning the empty table when evaluation should stop. To achieve this, new rows are computed separately in a CTE and used as guards to prevent addition of the previous results if the CTE contains no rows. \autoref{macro:evaluation_cte} showing the final \texttt{evaluation}-CTE implementing this approach.
+To work around this restriction, the working table is added to the actual result-rows in each iteration. If we choose this approach the working-table will never be empty, consequently evaluation would never end. Therefore we need to manually take care of returning the empty table when evaluation should stop. To achieve this, new rows are computed separately in a CTE and used as a guard to prevent addition of the previous results if the CTE contains no rows. \autoref{macro:evaluation_cte} showing the final \texttt{evaluation}-CTE implementing this approach.
 
 \begin{figure}[h!]\centering
   \sqlcode{snippets/evaluation_cte.sql}

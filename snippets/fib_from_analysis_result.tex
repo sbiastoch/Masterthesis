@@ -1,4 +1,4 @@
-\begin{lstlisting}[language={},basicstyle=\scriptsize]
+\begin{lstlisting}[basicstyle=\ttfamily\scriptsize]
 ### Analysis result: ###
 Name:              pg_proc.fib_from
 Return type:       TAtom "numeric" [$\checkmark$ hashable]
@@ -19,8 +19,8 @@ Recursive Scenarios:
         SELECT NOT $\udfArg{1}$ <= 2 AND (SELECT (SELECT (SELECT True)))
      Query:
         SELECT (SELECT "subquery0"."i" + "subquery1"."i" 
-                 FROM (SELECT fib_from($\udfArg{1}$ - 1) AS "fib_from") AS "subquery0"("i"), 
-                      (SELECT fib_from($\udfArg{1}$ - 2) AS "fib_from") AS "subquery1"("i")
+                 FROM (SELECT fib_from($\udfArg{1}$ - 1)) AS "subquery0"("i"), 
+                      (SELECT fib_from($\udfArg{1}$ - 2)) AS "subquery1"("i")
                ) :: numeric
 
 Basecase Scenarios:

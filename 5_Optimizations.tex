@@ -1,6 +1,6 @@
 \chapter{Optimizations}
 
-If certain characteristics of the UDF are detected optimized translation templates which exploit those characteristics can be chosen . This may either improve performance or enables us to implement work-arounds for settings where the original templates are not applicable otherwise.
+If certain characteristics of the UDF are detected optimized translation templates which exploit those characteristics can be chosen. This may either improve performance or enables us to implement work-arounds for settings where the original templates are not applicable otherwise.
 
 To make these optimizations no change in the scenario analysis is required. Instead the scenarios of the UDF are tested for the properties and the results are included in the intermediate representation. so that This enables the best template to be chosen.
 
@@ -59,7 +59,7 @@ The function that computed the length of the \textit{collatz-series} (\autoref{l
     \label{collatz_sql_with_scenarios}
 \end{figure}
 
-The evaluation thus happens also in a strict linear manner. As each scenario depends only on the result of the previous result the work-around (see \autoref{macro:evaluation_cte}) to access all previous computed results becomes unnecessary. In each iteration exactly one result is computed and in the next iteration the dependant scenario will be evaluated. There is no need to add all previous results to the current result in order to have those rows available later (\autoref{opt_sr_evaluation_cte}). Only actually new rows are added to the results.
+The evaluation thus happens in a strict linear manner. As each scenario depends only on the result of the previous result the work-around (see \autoref{macro:evaluation_cte}) to access all previous computed results becomes unnecessary. In each iteration exactly one result is computed and in the next iteration the dependant scenario will be evaluated. There is no need to add all previous results to the current result in order to have those rows available later (\autoref{opt_sr_evaluation_cte}). Only actually new rows are added to the results.
 
 \begin{figure}[h!]
     \centering
@@ -141,7 +141,7 @@ q := (WITH [<alias> AS (<nonrecursive sql>), ...] <q>)
     \label{tr_grammar}
 \end{figure}
 
-CTEs can be included in the query if they are only referenced from the callsite-arguments. Callsite-arguments are evaluated during callgraph creation. During evaluation the callsites including their arguments are replaced by references to their results. That is way CTEs are present but unused during evaluation. Therefore the resulting query is eligible for the tail recursive optimization.
+CTEs can be included in the query if they are only referenced from the callsite-arguments. Callsite-arguments are evaluated during callgraph creation. During evaluation the callsites including their arguments are replaced by references to their results. Because of this, CTEs are present but unused during evaluation. Therefore the resulting query is eligible for the tail recursive optimization.
 
 \section{Constant argument removal}
 

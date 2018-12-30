@@ -1,7 +1,6 @@
 \footnotesize
 \begin{lstlisting}[language={}]
 Input:	q/fib.sql (fib(numeric))
-Warning: Udf from file has replaced existing function in database!
 
 Analysis summary:
   Callsites:		2
@@ -35,13 +34,13 @@ Recursive Scenarios:
      Query:
         SELECT ((fib($\udfArg{1}$ - (1)))
                 +
-                (fib($\udfArg{1}$ - (2)))) :: numeric AS "case" 
+                (fib($\udfArg{1}$ - (2)))) :: numeric
 
 Basecase Scenarios:
   1) Predicate:
         SELECT $\udfArg{1}$ <= (2) 
      Query:
-        SELECT (1) :: numeric AS "case" 
+        SELECT (1) :: numeric 
         
 Output:	fib(numeric) to database
 \end{lstlisting}

@@ -6,7 +6,7 @@
 % Adding CTEs
 % Post processing
 
-This chapter gives detailed insights on the way a given query is sliced into its different evaluation-scenarios by presenting inference rules. Before each inference rule, I give an insight into the idea before formalizing it.
+This chapter gives detailed insights into the way a given query is sliced into its different evaluation-scenarios by presenting inference rules. I will illustrate the basic idea of each inference rule before formalizing it.
 
 I begin by presenting a set of four rules which are required to translate most basic \CASE-expressions. The nonrecursive rules \RREC and \RBASE handle the basecases if the SQL-fragment is directly a recursive call or does not contain any call at all. Disassembling \CASE-expressions is the true core of the translation process as it is the origin of any scenario. Each \WHEN-\THEN~branch is processed step by step by the \RWHEN-rule and eventually the \ELSE-branch by the \RELSE-rule.
 
@@ -151,7 +151,7 @@ $$
     \caption{Rule (a) assigns any query-fragment to $B$ if it does not contain any callsites. (b) Does handle callsites by adding them to $R$. For now, please ignore $T$ and $C$.}\label{rule:base_and_rec}
 \end{figure}
 
-The \RREC-rule enforces the overall constraint that no callsite may have a recursive argument. This restriction is due to the strategy on building the callgraph. It is based on evaluating the arguments of the callsites independently from the whole query. If the arguments itself would be recursive this would not be possible.
+The \RREC-rule enforces the overall constraint that no callsite may have a recursive argument. This restriction is due to the strategy how the callgraph is built. It is based on evaluating the arguments of the callsites independently from the whole query. If the arguments itself would be recursive this would not be possible.
 
 \subsection{Simple \CASE-expressions}
 \begin{wrapfigure}{r}{.3\textwidth}\centering
@@ -165,9 +165,9 @@ END
 \label{lst:case}
 \end{wrapfigure}
 
-The other rules endeavoured in every nontrivial translation are those for handling \texttt{CASE}-expressions (\autoref{lst:case}). They are the original source of any scenario generated. \texttt{CASE}-expressions are \textit{conditional-expression}, other conditionals are \texttt{COALESCE}, \texttt{NULLIF}, \texttt{GREATEST} and \texttt{LEAST}. All of them can be rewritten as \texttt{CASE} (see \autoref{sql:conditionals}).
+The other rules endeavoured in every nontrivial translation are those for handling \texttt{CASE}-expressions (\autoref{lst:case}). They are the original source of any scenario generated. \texttt{CASE}-expressions are \textit{conditional-expression}, other conditionals are \texttt{COALESCE}, \texttt{NULLIF}, \texttt{GREATEST} and \texttt{LEAST}. All of them can be rewritten as \texttt{CASE} (see \autoref{conditional_normalization}).
 
-\texttt{CASE}-expressions in general are a handy way of writing nested \texttt{IF}s. Each \texttt{WHEN} implies all preceding \texttt{WHEN}s to have failed. Therefore each \texttt{WHEN} contains an implicit negation of all preceding \texttt{WHEN}s. The goal is to make the implicit and complete predicates explicit so they may be executed independently.
+\texttt{CASE}-expressions in general are a handy way of writing nested \texttt{IF}s. Each \texttt{WHEN} implies all preceding \texttt{WHEN}s to have failed. Therefore each \texttt{WHEN} contains an implicit negation of all preceding \texttt{WHEN}s. The goal is to extend the predicate of a singular \texttt{WHEN} in order to make the actual whole predicate explicit. This way one can unnest the "IFs" to be evaluable independently from each other.
 
 \autoref{flow:simple_case} visualizes the logical flow of a simple \texttt{CASE}-expression with callsites located in the first \texttt{WHEN} and in the \texttt{ELSE}-branch. An arrow to the right means the predicate is fulfilled, an arrow down denotes the negation. Predicates $p_i$ are surrounded by a single lined border while a doubled bordered box marks a possible result $r$ of the \texttt{CASE}-statement. An asterisk $\ast$ indicates a query-fragment including a recursive subexpression (according to $\hasCallsite$).
 
@@ -403,7 +403,7 @@ If a recursive \texttt{CASE}-expression is nested inside the \texttt{THEN}-part,
 
 The \RWHEN-rule works branch by branch. It is only applicable if not both, the predicate $p$ and the remaining branches $bs$, contain callsites (1st premise). Predicate $p$ and resulting expression $e$ are analyzed, obtaining scenarios $(B_p, R_p)$ for the predicate and $(B_e, R_e)$ for the resulting expression (2nd and 3rd premise). The nonrecursive scenarios of the predicate $B_p$ contain $n$ tuples of a predicate (of the scenario, ie. the "predicate of the predicate") and a result, the actual predicate (4th premise).
 
-The last premise analyzes the remaining branches for those scenarios where the predicate is nonrecursive (from $B_p$). The predicate of the remaining branches is thus prepended the (positive) predicate of the predicate $p_p$ and the negated actual predicate $p'$. The scenarios of later branches are added by the actual rule to the set of non-/recursive scenarios.
+The last premise analyzes the remaining branches for those scenarios where the predicate is nonrecursive (from $B_p$). The predicate of the remaining branches is thus prepended to the (positive) predicate of the predicate $p_p$ and the negated actual predicate $p'$. The scenarios of later branches are added by the actual rule to the set of non-/recursive scenarios.
 
 \begin{figure}[h!]
     \centering\small
@@ -443,7 +443,7 @@ $$\inferrule{
     \label{fig:my_label}
 \end{figure}
 
-With the four rules of the previous section very simple \texttt{CASE}-expressions (with constants or callsites only) can be analyzed. Nonrecursive subtrees of the AST are handled by the \RBASE-rule while callsites are considered with the \RREC-rule. Following this is a rule to traverse expressions like \texttt{1 + fn(...)}.
+With the four rules of the previous section very simple \texttt{CASE}-expressions (with constants or callsites only) can be analyzed. Nonrecursive subtrees of the AST are handled by the \RBASE-rule while callsites are considered with the \RREC-rule. In the following section rules are introduced to traverse expressions like \texttt{1 + fn(...)}.
 
 \section{Handling recursive operands}
 
@@ -521,7 +521,7 @@ $$\inferrule{
 
 Nonrecursive scenarios of the function are created by replacing each argument with the expression from one of its scenarios. The cross product between all nonrecursive scenarios $B_i$ is used to build a set of all possible combinations of nonrecursive scenarios. The predicates $p_i$ of the scenario of each of the $n$ arguments are all unioned by \texttt{AND}. The arguments of the original function are replaced with the expressions generated by the scenarios.
 
-To create all scenarios of those functions where at least one argument is recursive, the cross product between all scenarios of an argument (recursive and nonrecursive) is built. Only those combinations where at least one expression is recursive, are kept.
+To create all scenarios of a function where at least one argument is recursive, the cross product between all scenarios of an argument (recursive and nonrecursive) is built. Only those combinations where at least one expression is recursive, are kept.
 
 To translate entire queries the three different parts of a query are needed to be traversed: The \texttt{SELECT}-list, the \texttt{FROM}-list and the predicate in \texttt{WHERE}. The idea from the \REXPR-rule applies here as well, but some additional premises must hold. Only one of the three clauses may be recursive. If the \texttt{WHERE}-clause contains a callsite any other callsites located elsewhere in the query would depend on that specific callsite. If a callsite is present in the \texttt{FROM}-list, the execution of the callsites within \texttt{SELECT}- and \texttt{WHERE}-clauses would depend on the callsite in the \texttt{FROM}-list. Therefore only one of the three parts of a query may contain a callsite.
 
@@ -685,7 +685,7 @@ $
 
 \section{Handling CTEs}
 
-Common Table Expressions (CTEs) are a powerful tool to structure and tweak complex queries. They work like temporary tables which only exist for an individual query. However, allowing CTEs containing callsites introduce some complexities needing to be considered when analyzing.
+Common Table Expressions (CTEs) are a powerful tool to structure and tweak complex queries. They work like temporary tables which only exist for an individual query. However, while allowing CTEs containing callsites introduces some complexities needing to be considered when analyzing, allowing CTEs not containing callsites is - for now - simply impossible.
 
 % Without CTEs hasCallsite just checks the subtree
 With S-F-W queries the notion of \textit{containing a callsite} (or being \textit{recursive}) is simple. If a query-fragment $e$ contains a callsite, the subexpression is recursive: $\hasCallsite(e) = fn \sqsubset e$. From an implementation point of view it is as simple as filtering the AST of $e$ for callsites.
@@ -774,7 +774,7 @@ References to CTEs can easily be collected from a query-fragment by searching fo
 \end{wrapfigure}
 
 % Row-references vs. table-variables
-Note that two different types of free variables inside a query-fragment can occur: \textit{Table-Variables} and \textit{Row-References}. Table-variables like \texttt{T} can exclusively be used in ~\FROM~ and reference an entire table. This table-variables are introduced either by the existence of a table in the current database or by a CTE. Row-references like \texttt{T.v} point to a single table-row of a table referenced by ~\FROM. A bare row-reference cannot cause a query to be recursive. It is always the from-clause that declares this row-references and binds it to a table. This table is always evaluated first, no matter whether any row-reference is used at all. For this reason it is sufficient to track only \textit{table}-variables and ignore row-references entirely.
+Note that two different types of free variables inside a query-fragment can occur: \textit{Table-Variables} and \textit{Row-References}. Table-variables like \texttt{T} can exclusively be used in ~\FROM~ and reference an entire table. This table-variables are declared either by the existence of a table in the current database or by a CTE. Row-references like \texttt{T.v} point to a single table-row of a table referenced by ~\FROM. A bare row-reference cannot cause a query to be recursive. It is always the from-clause that declares this row-references and binds it to a table. This table is always evaluated first, no matter whether any row-reference is used at all. For this reason it is sufficient to track only \textit{table}-variables and ignore row-references entirely.
 
 As we now know which CTEs in scope are recursive, we can reformulate the function to determine whether a query-fragment contains a callsite directly or via a reference:
 $$\hasCallsite(T, e) = fn(\dots) \sqsubset e \lor \FV(e) \cap T \neq \emptyset$$
@@ -797,7 +797,7 @@ $$\quad(\textsc{ref})\inferrule{
 %Each CTE-scenario is augmented with its dependencies to previously defined CTEs. Each CTE is sliced into its different scenarios, then each scenario is analyzed, removed from the query and stored in the queue. When all CTEs are processed and the actual query is translated, only those CTEs are reattached to the query-scenario that are actually used. Indirect callsites can be detected by simply checking if there exists a free table-variable that is enlisted in $T$.
 
 \subsection{Tracking CTE-dependencies}\label{tracking_cte_dependencies}
-As has been shown, CTEs may use other CTEs. so that Therefore we need to keep track of the dependencies of a scenario. This happens similar to the creation of the set $T$ of recursive CTEs. For each CTE \texttt{C} we collect all its CTE-references \texttt{$C_i$} from the scenario (predicate and query) together with their dependencies. For an illustration see \autoref{fig:cte_deps}.
+As has been shown, CTEs may use other CTEs directly or indirectly. Therefore we need to keep track of the dependencies of a scenario. This happens similar to the creation of the set $T$ of recursive CTEs. For each CTE \texttt{C} we collect all its CTE-references \texttt{$C_i$} from the scenario (predicate and query) together with their dependencies. For an illustration see \autoref{fig:cte_deps}.
 
 \iffalse
 \begin{figure}[h!]
@@ -928,7 +928,7 @@ The function $\deps$ collects free table-variables (ie. used CTEs) of $q$ togeth
 
 \subsection{{\normalfont\RCTE}-rule: Collecting and analyzing CTE-Scenarios}
 
-The idea from the \REXPR-rule of building the cross product between all scenarios of its subtrees is also present in the \RCTE-rule. After all our extended notion of a function does not work (with?) the entire \texttt{WITH}-clause. There is no \texttt{WITH}-"function" node at the root with $n$ independent children, one for each CTE: $\texttt{WITH}(t_1, t_2, t_3, q)$. It is more a right-deep tree of individual CTE-definitions where each CTE depends on the preceding CTEs: $\texttt{CTE}(t_1, \texttt{CTE}(t_2, \texttt{CTE}(t_3, q)))$. Therefore each \texttt{CTE} must be analyzed individually and the environment is modified accordingly for every CTE-scenario. With the changed environment following CTEs are analyzed and eventually the actual query $q$.
+The idea from the \REXPR-rule of building the cross product between all scenarios of its subtrees is also present in the \RCTE-rule. Yet our extended notion of a function is not suitable for an entire \texttt{WITH}-clause. There is no \texttt{WITH}-"function" node at the root with $n$ independent children, one for each CTE: $\texttt{WITH}(t_1, t_2, t_3, q)$. It is more a right-deep tree of individual CTE-definitions where each CTE depends on the preceding CTEs: $\texttt{CTE}(t_1, \texttt{CTE}(t_2, \texttt{CTE}(t_3, q)))$. Therefore each \texttt{CTE} must be analyzed individually and the environment is modified accordingly for every CTE-scenario. With the changed environment following CTEs are analyzed and eventually the actual query $q$.
 
 The environment is changed in two ways: First, the list of recursive table-variables $T$ is updated. If the evaluation-scenario of the CTE is recursive the alias of the CTE is added to $T$. If the CTE-scenario is nonrecursive the alias is removed from $T$ since any recursive reference is now shadowed by this nonrecursive CTE. Second, the CTE-scenario is added alongside its dependencies to the CTE-store $C$.
 
@@ -1076,7 +1076,7 @@ Expressions, functions etc. can simply be traversed collecting results from each
 }\quad(\footnotesize\textsc{remove expr})
 \end{equation*}
 
-The \textsc{remove select}-rule traverses each element of the select-list if the callsite(s) are located within the select-clause. The from- and where-clauses are discarded as the value of the callsite-arguments must be uncorrelated to the row-references declared in \FROM.
+The \textsc{remove select}-rule traverses each element of the select-list if the callsite(s) are located within the select-clause. The from- and where-clauses are discarded as the value of the callsite-arguments must be uncorrelated with row-references declared in any outer \FROM.
 
 \begin{equation*}
 \inferrule{

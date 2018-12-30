@@ -1,3 +1,4 @@
+- fix final optimizations section!!!
 - Layout
 - OS:judgements?
 - 
@@ -24,5 +25,3 @@ nice to have:
 - cool tables
 - unify notation of callsite_id
 - constraint: "static number of callsites" to avoid tables? => not enforceable!
-- Age of Empires Turnier mit Michi und Johannes!!!
-- Bier => Bierbierbier im bettbettbett
