@@ -1,0 +1,43 @@
+\footnotesize
+\begin{verbatim}
+Usage: twr (-f FILE | -d DIR | -u FUNC | -a) [-c] [-r] [-p] [-n FNAME/SUFFIX]
+           [--user USER] [--password PASSWORD] [--host HOST] [--port PORT]
+           [--database DATABASE] [-o PATH] [--disable-optimizations|--no-opt]
+           [--disable-tail-recursion|--no-tr]
+           [--disable-single-recursion|--no-sr]
+           [--disable-constant-parameters|--no-cp] [-v] [-q|--quiet]
+  Optimize recursive User-Defined Functions for PostgreSQL.
+
+Available options:
+  -f FILE                  Translate a UDF from a file
+  -d DIR                   Translate UDFs that are given as single files in a
+                           folder
+  -u FUNC                  Translate an UDF by specifying the signature of an
+                           existing function, eg. fib(int)
+  -a                       Translate entire database. EXPERIMENTAL! Use with
+                           caution!
+  -c                       Persist translation to database
+  -r                       Replace existing function in database
+  -p                       Print translation(s) to stdout
+  -n FNAME/SUFFIX          Name or prefix (for directory/db translation) of the
+                           generated function.
+  --user USER              Postgres username, default is ENV[USER]
+  --password PASSWORD      Password for PostgreSQL user
+  --host HOST              Host of PostgreSQL
+  --port PORT              Port of PostgreSQL
+  --database DATABASE      Name of a PostgreSQL database, default is USER
+  -o PATH                  Create a file with the translated function.
+  --disable-optimizations,--no-opt
+                           Disable all optimizations
+  --disable-tail-recursion,--no-tr
+                           Do not use optimizations for tail recursion
+  --disable-single-recursion,--no-sr
+                           Do not use optimizations for single recursion
+  --disable-constant-parameters,--no-cp
+                           Disable optimizations for constant function
+                           parameters
+  -v                       Level of verbosity: -v = input/output info, -vv =
+                           translation summary, -vvv = detailed analysis output
+  -q,--quiet               No output
+  -h,--help                Show this help text
+\end{verbatim}

@@ -1,0 +1,66 @@
+\begin{lstlisting}[language={},basicstyle=\scriptsize]
+### Analysis result: ###
+Name:              pg_proc.fib_cte
+Return type:       TAtom "numeric" [$\checkmark$ hashable]
+Tail-Recursive:    $\times$
+Single-Recursion:  $\times$
+Parameter:
+  1) TAtom "numeric" [$\checkmark$ hashable]
+Constant Parameter:
+   - none -
+Callsites:
+  1) Param 1:
+        WITH v("i") AS (SELECT 1)
+        SELECT (SELECT $\udfArg{1}$ - (SELECT "CTE3"."i" FROM v AS "CTE3"("i"))) 
+  2) Param 1:
+        SELECT (SELECT $\udfArg{1}$ - 2)
+Recursive Scenarios:
+  1) Callsites: 1, 2
+     Predicate:
+        WITH v("i") AS (SELECT 1), 
+             s("i") AS (SELECT fib_cte($\udfArg{1}$ - (SELECT "CTE3"."i" FROM v AS "CTE3"("i")))), 
+             t("i") AS (SELECT fib_cte($\udfArg{1}$ - 2)), 
+             u("i") AS (
+               SELECT "CTE4"."i" + "CTE5"."i"                    
+               FROM s AS "CTE4"("i"),
+                    t AS "CTE5"("i")
+             ),
+             p("i") AS (SELECT $\udfArg{1}$ <= 2)
+        SELECT NOT (SELECT "CTE0"."i" FROM p AS "CTE0"("i"))
+               AND (SELECT $\udfArg{1}$ > 0)
+     Query:
+        WITH v("i") AS (SELECT 1), 
+             s("i") AS (SELECT fib_cte($\udfArg{1}$ - (SELECT "CTE3"."i" FROM v AS "CTE3"("i")))), 
+             t("i") AS (SELECT fib_cte($\udfArg{1}$ - 2)), 
+             u("i") AS (
+               SELECT "CTE4"."i" + "CTE5"."i"                    
+               FROM s AS "CTE4"("i"),
+                    t AS "CTE5"("i")
+             ),
+             p("i") AS (SELECT $\udfArg{1}$ <= 2)
+        SELECT (SELECT "CTE2"."i" FROM u AS "CTE2"("i")) :: numeric 
+
+Basecase Scenarios:
+  1) Predicate:
+        WITH v("i") AS (SELECT 1), 
+             u("i") AS (SELECT (SELECT "CTE6"."i" FROM v AS "CTE6"("i"))), 
+             p("i") AS (SELECT $\udfArg{1}$ <= 2)
+        SELECT (SELECT NOT $\udfArg{1}$ > 0)
+     Query:
+        WITH v("i") AS (SELECT 1), 
+             u("i") AS (SELECT (SELECT "CTE6"."i" FROM v AS "CTE6"("i"))), 
+             p("i") AS (SELECT $\udfArg{1}$ <= 2)
+        SELECT (CASE WHEN (SELECT "CTE0"."i" FROM p AS "CTE0"("i"))
+                       THEN (SELECT "CTE1"."i" FROM v AS "CTE1"("i"))
+                     ELSE (SELECT "CTE2"."i" AS "i" FROM u AS "CTE2"("i"))
+               END) :: numeric 
+
+  2) Predicate:
+        WITH v("i") AS (SELECT 1)
+             p("i") AS (SELECT $\udfArg{1}$ <= 2)
+        SELECT "CTE0"."i" FROM p AS "CTE0"("i")
+     Query:
+        WITH v("i") AS (SELECT 1)
+             p("i") AS (SELECT $\udfArg{1}$ <= 2)
+        SELECT (SELECT "CTE1"."i" FROM v AS "CTE1"("i")) :: numeric
+\end{lstlisting}

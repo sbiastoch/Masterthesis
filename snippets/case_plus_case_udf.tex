@@ -1,0 +1,14 @@
+\begin{minted}{postgresql}
+CREATE FUNCTION case_plus_case(n numeric) RETURNS numeric AS $$
+SELECT CASE
+     WHEN n < 1 THEN 1
+     ELSE case_plus_case(n - 1)
+   END
+   +
+   CASE
+     WHEN n < 3 THEN 2
+     WHEN n < 4 THEN case_plus_case(n - 2)
+     ELSE 1 - case_plus_case(n - 3)
+   END
+$$ LANGUAGE SQL;
+\end{minted}

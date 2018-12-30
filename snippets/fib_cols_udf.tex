@@ -1,0 +1,10 @@
+\begin{minted}{postgresql}
+CREATE FUNCTION fib_cols(n NUMERIC) RETURNS NUMERIC AS $$
+SELECT fib.n_1 + fib.n_0 FROM (
+  SELECT CASE WHEN n <= 2 THEN 0
+              ELSE fib_cols(n - 1) END,
+         CASE WHEN n <= 2 THEN 1
+              ELSE fib_cols(n - 2) END
+) AS fib(n_1, n_0)
+$$ LANGUAGE SQL;
+\end{minted}

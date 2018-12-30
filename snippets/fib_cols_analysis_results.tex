@@ -1,0 +1,61 @@
+\begin{lstlisting}[language={},basicstyle=\scriptsize]
+### Analysis result: ###
+Name:              pg_proc.fib_cols
+Return type:       TAtom "numeric" [$\checkmark$ hashable]
+Tail-Recursive:    $\times$
+Single-Recursion:  $\times$
+Parameter:
+  1) TAtom "numeric" [$\checkmark$ hashable]
+Constant Parameter:
+   - none -
+Callsites:
+  1) Param 1:
+        SELECT $\udfArg{1}$ - 2 
+  2) Param 1:
+        SELECT $\udfArg{1}$ - 1 
+  3) Param 1:
+        SELECT $\udfArg{1}$ - 1 
+  4) Param 1:
+        SELECT $\udfArg{1}$ - 2 
+Recursive Scenarios:
+  1) Callsites: 1
+     Predicate:
+        SELECT (SELECT $\udfArg{1}$ <= 2 AND NOT $\udfArg{1}$ <= 2) 
+     Query:
+        SELECT ("subquery0"."n_1" + "subquery0"."n_0") :: numeric
+        FROM (
+          SELECT 0,
+                 fib_cols($\udfArg{1}$ - 2)
+        ) AS "subquery0"("n_1", "n_0")
+
+  2) Callsites: 2
+     Predicate:
+        SELECT (SELECT NOT $\udfArg{1}$ <= 2 AND $\udfArg{1}$ <= 2) 
+     Query:
+        SELECT ("subquery0"."n_1" + "subquery0"."n_0") :: numeric
+        FROM (
+          SELECT fib_cols($\udfArg{1}$ - 1), 
+                 1
+        ) AS "subquery0"("n_1", "n_0")
+
+  3) Callsites: 3, 4
+     Predicate:
+        SELECT (SELECT (NOT $\udfArg{1}$ <= 2 AND NOT $\udfArg{1}$ <= 2)) 
+     Query:
+        SELECT ("subquery0"."n_1" + "subquery0"."n_0") :: numeric
+        FROM (
+          SELECT fib_cols($\udfArg{1}$ - 1), 
+                 fib_cols($\udfArg{1}$ - 2)
+        ) AS "subquery0"("n_1", "n_0")
+
+Basecase Scenarios:
+  1) Predicate:
+        SELECT (SELECT ($\udfArg{1}$ <= 2 AND $\udfArg{1}$ <= 2)) 
+     Query:
+        SELECT ("subquery0"."n_1" + "subquery0"."n_0") :: numeric
+        FROM (
+          SELECT 0,
+                 1
+        ) AS "subquery0"("n_1", "n_0")
+
+\end{lstlisting}

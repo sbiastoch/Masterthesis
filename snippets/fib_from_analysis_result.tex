@@ -1,0 +1,31 @@
+\begin{lstlisting}[language={},basicstyle=\scriptsize]
+### Analysis result: ###
+Name:              pg_proc.fib_from
+Return type:       TAtom "numeric" [$\checkmark$ hashable]
+Tail-Recursive:    $\times$
+Single-Recursion:  $\times$
+Parameter:
+  1) TAtom "numeric" [$\checkmark$ hashable]
+Constant Parameter:
+   - none -
+Callsites:
+  1) Param 1:
+        SELECT (SELECT $\udfArg{1}$ - 1) 
+  2) Param 1:
+        SELECT (SELECT $\udfArg{1}$ - 2) 
+Recursive Scenarios:
+  1) Callsites: 1, 2
+     Predicate:
+        SELECT NOT $\udfArg{1}$ <= 2 AND (SELECT (SELECT (SELECT True)))
+     Query:
+        SELECT (SELECT "subquery0"."i" + "subquery1"."i" 
+                 FROM (SELECT fib_from($\udfArg{1}$ - 1) AS "fib_from") AS "subquery0"("i"), 
+                      (SELECT fib_from($\udfArg{1}$ - 2) AS "fib_from") AS "subquery1"("i")
+               ) :: numeric
+
+Basecase Scenarios:
+  1) Predicate:
+        SELECT $\udfArg{1}$ <= 2
+     Query:
+        SELECT 1
+\end{lstlisting}

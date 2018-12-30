@@ -1,0 +1,31 @@
+\begin{lstlisting}[language={},basicstyle=\scriptsize]
+### Analysis result: ###
+Name:              pg_proc.sieve
+Return type:       TArray (TAtom "int4") [$\checkmark$ hashable]
+Tail-Recursive:    $\times$
+Single-Recursion:  $\checkmark$
+Parameter:
+  1) TAtom "int4" [$\checkmark$ hashable]
+Constant Parameter:
+  2) TArray (TAtom "int4") [$\checkmark$ hashable]
+Callsites:
+  1) Param 1:
+        $\udfArg{1}$ + 1
+Recursive Scenarios:
+  1) Callsites: 1
+     Predicate:
+        SELECT NOT (2 * $\udfArg{1}$) > array_length($\udfArg{2}$, 1)
+     Query:
+        SELECT array_agg("RTFunc0"."v") :: int4[]
+        FROM unnest($\udfArg{2}$) AS "RTFunc0"("v")
+        WHERE ("RTFunc0"."v" = $\udfArg{1}$ OR "RTFunc0"."v" % $\udfArg{1}$ <> 0) 
+          AND "RTFunc0"."v" = ANY(sieve($\udfArg{1}$ + 1, $\udfArg{2}$))
+
+Basecase Scenarios:
+  1) Predicate:
+        SELECT (2 * $\udfArg{1}$) > array_length($\udfArg{2}$, 1)
+     Query:
+        SELECT array_agg("RTFunc0"."v") :: int4[]        
+        FROM unnest($\udfArg{2}$) AS "RTFunc0"("v")
+        WHERE True
+\end{lstlisting}

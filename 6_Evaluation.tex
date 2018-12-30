@@ -1,18 +1,18 @@
 \chapter{Evaluation and discussion}\label{results_discussion}
 
-This chapter evaluates the performance of the automatic generated translation. I compare runtimes of various versions of the same functions. I compare the original function against its translation. I measure the effect of the presented optimizations and compare the translation against a manually optimized formulation.
+This chapter evaluates the performance of the automatically generated translation. I compare runtimes of various versions of the same functions. I compare the original function against its translation. I measure the effect of the presented optimizations and compare the translation against a manually optimized formulation.
 
-Plots are drawn using logarithmic x- and y-axis to depict the large differences in runtimes. Additionally, polynomial growth is better to differentiate from exponential when using logscales. A polynomial function on a xy-logscale appears as a straight line, the slope determines the degree of the polynomial. A linear function, ie. a polynomial of degree 1 has a slope of 1.
+Plots are drawn using logarithmic x- and y-axis to depict the large differences in runtimes. Additionally, polynomial growth is easier to differentiate from exponential growth when using logscales. A polynomial function on a xy-logscale appears as a straight line, the slope determines the degree of the polynomial. A linear function, ie. a polynomial of degree 1, has a slope of 1.
 
 \paragraph*{Evaluation setup}
-The evaluations were run on a System running Ubuntu 18.04.1 with 4.15 Linux-Kernel, AMD 1900X with 8x 3.80GHz (16 Threads), 256MB NVMe SSD and 16GB DDR4 RAM. PostgreSQL 10.6 with default settings, if not stated otherwise.
+The evaluations were run on a system running Ubuntu 18.04.1 with 4.15 Linux-Kernel, AMD 1900X with 8x 3.80GHz (16 Threads), 256MB NVMe SSD and 16GB DDR4 RAM. PostgreSQL 10.6 on default settings, if not stated otherwise.
 
-The call stack of PostgreSQL is limited in size, to prevent infinite recursion from quickly sucking up the entires system memory. The default in PostgreSQL 10.6 (\texttt{max\_stack\_depth}) is 2MB and can be manually increased. The maximum stack size is capped by the settings of the Operating System.\\
-The available working memory (\texttt{work\_mem}) specifies how much memory can be consumed by in-memory operations like sorting or hashing. If the memory is exceeded, temporary results are materialized on disk. The default working memory is 2MB. \cite[p. 512 ff.]{psql}
+The call stack of PostgreSQL is limited in size to prevent infinite recursion from quickly sucking up the entire system memory. The default in PostgreSQL 10.6 (\texttt{max\_stack\_depth}) is 2MB and can manually be increased. The maximum stack size is capped by the settings of the Operating System.\\
+The available working memory (\texttt{work\_mem}) specifies how much memory can be consumed by in-memory operations like sorting or hashing. If the memory is exceeded temporary results are materialized on disk. The default working memory is 2MB. \cite[p. 512 ff.]{psql}
 
-To fully exploit the capabilities of each implementation, the \texttt{max\_stack\_size} is set to 7680kB (the limit of the OS) and working memory (\texttt{work\_mem}) to 512MB. This way recursive functions can run longer before being killed. The high working memory enables operations like sorting or hashing to be performed in memory, even for larger inputs.
+To fully exploit the capabilities of each implementation the \texttt{max\_stack\_size} is set to 7680kB (the limit of the OS) and the working memory (\texttt{work\_mem}) to 512MB. This way recursive functions can run longer before being killed. The high working memory enables operations like sorting or hashing to be performed in memory, even for larger inputs.
 
-The original, recursive functions were run until the stack size was exceeded and the function was killed. The translations were run (where possibly) at least as long as the original function until the trend of the curves seems to be clear.
+The original recursive functions were run until the stack size was exceeded and the function was killed. The translations were run (where possible) at least as long as the original function until the trend of the curves seems to be clear.
 
 To track plans and times of parts of the translation the extension \texttt{auto\_explain} was used with \texttt{log\_nested\_statements}, \texttt{log\_verbose} and \texttt{log\_timing} enabled. Logging format (\texttt{log\_format}) was set to JSON.
 
@@ -23,26 +23,26 @@ The generic template is the default template without any UDF-specific optimizati
 \begin{figure}[h!]
     \centering\small
     \includesvg{plots/fib}
-    \caption{Run time of the fibonacci function in its recursive version and the automatic translation. Additionally, a manually optimized version is compared.}
+    \caption{Run time of the Fibonacci function in its recursive version and the automatic translation. Additionally, a manually optimized version is compared.}
     \label{fig:fib_times}
 \end{figure}
 
-, the automatic translation and the third, manually optimized fibonacci function\footnote{From \url{https://wiki.postgresql.org/wiki/Fibonacci_Numbers}, accessed: 15/12/2018}. To represent the wide variety the plots are drawed with logarithmic scales.
+, the automatic translation and the third manually optimized Fibonacci function\footnote{From \url{https://wiki.postgresql.org/wiki/Fibonacci_Numbers}, accessed: 15/12/2018}. To represent the wide variety the plots are drawn with logarithmic scales.
 
-Runtimes vary greatly between the three implementation. The original implementation is faster for very small inputs as it has less overhead then the translation. Additionally, the first two (\texttt{fib(\$n-1)} and \texttt{fib(\$n-2)}) calls are inlined, which reduces overhead further. Yet, the runtime of the original function grows very fast, so that \texttt{fib(30)} already takes minutes. Finally, the recursive UDF is killed by PostgreSQL at a input of 32???
+Runtimes vary greatly between the three implementations. The original implementation is faster for very small inputs as it has less overhead then the translation. Additionally, the first two (\texttt{fib(\$n-1)} and \texttt{fib(\$n-2)}) calls are inlined which reduces overhead further. However, the runtime of the original function grows very fast, \texttt{fib(30)} already takes minutes.
 
-The translated function on the other hand is much faster. Where the original takes minutes, the translation is finished under 10ms. Even for \texttt{fib(1000)} the call returns after around 2 seconds. For very small inputs the runtime seems to be nearly constant, possibly because the tiny computations are marginalized by the constant overhead of the template. After leveling up, the runtime of the translation has a slope of approximietly 2, indicating quadratically growth.
+The translated function is much faster nonetheless. Where the original takes minutes the translation is finished under 10ms. Even for \texttt{fib(1000)} the call returns after about 2 seconds. For very small inputs the runtime seems to be nearly constant, possibly because the tiny computations are marginalized by the constant overhead of the template. After leveling up the runtime of the translation has a slope of approximately 2 indicating quadratically growth.
 
-Yet, the translation cannot keep up with the manually optimized function. The step from the translation to the manually optimized version is similar in magnitude as the step from the original to the translation: The runtime drops from minutes to milliseconds.\\
-But even here the runtime grows as the inputs gets even larger, but slower. The implementation provided runs nearly in linear time, exploiting that only two values needs to be remembered to compute the next value.\\
+Nevertheless, the translation cannot keep up with the manually optimized function. The step from the translation to the manually optimized version is similar in magnitude to the step from the original to the translation: The runtime drops from minutes to milliseconds.\\
+Though the runtime grows as the inputs get even larger, but in a slower pace. The implementation provided runs nearly in linear time exploiting the need of only two values to be remembered to compute the next value.\\
 
-Eventually, other limitations finally stop computing even larger fibonacci numbers in PostgreSQL: Somewhere between fib(600000) and fib(700000) the numeric datatype (which can represent numbers up to 131072 digits! \cite[p. 124 f.]{psql}) fails with an overflow. That said, the manual optimized implementation is "as good as we can get in SQL".
+Eventually, other limitations stop computing even larger fibonacci numbers in PostgreSQL: Somewhere between fib(600000) and fib(700000) the numeric datatype (which can represent numbers up to 131072 digits! \cite[p. 124 f.]{psql}) fails with an overflow. That being said, the manual optimized implementation is "as good as we can get" in SQL.
 
-Each implementation has changed the complexity-class of the implementation. The recursive implementation of \texttt{fib} is exponential \cite{} as previously computed values are repeatedly recomputed. Actually, the calltrees of the callsites are identical except a single call.
+Each implementation has changed the complexity-class of the implementation. The recursive implementation of \texttt{fib} is exponential \cite{} as previously computed values are repeatedly recomputed. Actually, the calltrees of the callsites are identical except for a single call.
 
-Problems with overlapping subproblems as with fibonacci are subject to an optimization technique called "Dynamic Programming" and "Memoization". Starting from optimal subproblems solutions of larger problems are incremental computed. Dynamic Programming requires you therefore to reformulate the algorithm to implement this approach. Memoization solves the problem top-down, keeping the original recursive structure of the function. For each call it is checked if this call already was evaluated. If so, the saved value is returned. Our translation uses the original recursive formulation and applies automatic memoization, avoiding any redundant calls.
+Problems with overlapping subproblems, as with fibonacci, are subject to an optimization technique called "Dynamic Programming" and "Memoization". Starting from optimal subproblems solutions of larger problems are incremental computed. Dynamic Programming requires therefore to reformulate the algorithm to implement this approach. Memoization solves the problem top-down keeping the original recursive structure of the function. It is checked for each call whether this call was already evaluated. If so, the saved value is returned. Our translation uses the original recursive formulation and applies automatic memoization avoiding any redundant calls.
 
-If an algorithm has no overlapping subproblems and there are no redundant calls, memoization gives no speedup. Each calltree of the callsites is disjunct. The evaluation of this algorithms grounds on recursivly dividing the problem in disjunct subproblems. The results are than recursivly merged to construct the final result ("divide and conquer"). An example with two callsites is \texttt{quicksort} (\autoref{udfs:quicksort}).
+If an algorithm has no overlapping subproblems and there are no redundant calls memoization gives no speedup. Each calltree of the callsites is disjunct. The evaluation of these algorithms grounds on recursively dividing the problem in disjunct subproblems. The results then are recursively merged to construct the final result ("divide and conquer"). An example with two callsites is \texttt{quicksort} (\autoref{udfs:quicksort}).
 
 \begin{figure}[h!]
     \centering\small
@@ -51,9 +51,9 @@ If an algorithm has no overlapping subproblems and there are no redundant calls,
     \label{fig:nonoverlapping_times}
 \end{figure}
 
-\autoref{fig:nonoverlapping_times} shows that the translation still causes a speedup ca. by factor 10 for \texttt{quicksort}. This is remarkable because the function does not profit from memoization. This plot illustrates boldly that PostgreSQL is highly optimized for efficient operations on tables and not for efficient function calls.
+\autoref{fig:nonoverlapping_times} shows that the translation still causes a speedup roughly by factor 10 for \texttt{quicksort}. This is remarkable because the function does not profit from memoization. This plot illustrates boldly how PostgreSQL is highly optimized for efficient operations on tables and not for efficient function calls.
 
-As last aspect of the generic translation, let us have a look at the fraction of time spent in each part of the translation \autoref{fig:split_times}. We see that the evaluation is by far the costliest part of the translation. Notably is the large fraction that the bare result selection takes. This can be explained, that each iteration of the evaluation works only on a linear growing working-table and appends its results without duplicate checking to the final result. The total result include all the lots of duplicates is only seen when selecting the result. Therefore both parts have constantly a significant influence of the total runtime, opposed to callgraph and basecase, that marginalize over time.
+As a last aspect of the generic translation, let us have a look at the fraction of time spent in each part of the translation \autoref{fig:split_times}. We see that the evaluation is by far the costliest part of the translation. Notably, it is the large fraction that the bare result selection takes. This can be explained by each iteration of the evaluation only working on a linear growing working-table and its results appending without duplicate checking to the final result. The total result includes all the lots of duplicates and is only seen when selecting the result. Therefore both parts constantly have a significant influence on the total runtime, opposed to callgraph and basecase that marginalize over time.
 
 \begin{figure}[h!]
     \centering\small
@@ -80,7 +80,7 @@ Impact of number of scenarios (Overhead by predicates) \autoref{fig:recn_times}
 
 \section{Single and Tail Recursion}
 
-Functions with only one callsite per scenario are called single recursive. I count them in the context of this thesis to the group of divide and conquer algorithms, as they have no overlapping subproblems. I use the \texttt{sum} (\autoref{udfs:sum}) function as exmaple in the following to study the performance of the translation.
+Functions with only one callsite per scenario are called single recursive functions. In the context of this thesis I rank them among the group of divide and conquer algorithms as they have no overlapping subproblems. Consecutively, I use the \texttt{sum} (\autoref{udfs:sum}) function as an example to study the performance of the translation.
 
 \begin{figure}[h!]
     \centering\small
@@ -90,9 +90,9 @@ Functions with only one callsite per scenario are called single recursive. I cou
 \end{figure}
 
 
-Surprisingly, the generic translation of \texttt{sum} yields to a runtime even worse than the original quicksort function. Quicksort was run with an array of descending numbers, thus the runtime equals the worst case of $O(n^2)$. The original single recursive version of \texttt{sum} grows roughly linear as we can see from the plot. The generic translation of \texttt{sum} degrades the performance of the linear function heavily. It is even worse than quicksort (\autoref{fig:nonoverlapping_times}), which is quadratic!
+Surprisingly, the generic translation of \texttt{sum} yields to a runtime even worse than the original quicksort function. Quicksort was run with an array of descending numbers thus the runtime equals the worst case of $O(n^2)$. The original single recursive version of \texttt{sum} grows roughly linear as we can see from the plot. The generic translation of \texttt{sum} degrades the performance of the linear function heavily. It is even worse than quicksort (\autoref{fig:nonoverlapping_times}) which is quadratic!
 
-\autoref{fig:split_sr_times} depicts the fraction of time each part of the translation consumes from the total computation time for a given input. Left, the data is taken from the badly performing, generic translation. Right, the translation using the single recursive optimization. We see, that in the generic translation evaluation marginalizes all other parts of the translation.
+\autoref{fig:split_sr_times} depicts the fraction of time each part of the translation consumes from the total computation time for a given input. On the left, the data is taken from the badly performing generic translation. On the right, the translation using the single recursive optimization is shown. Noticeably, the generic translation evaluation marginalizes all other parts of the translation.
 
 \begin{figure}[h!]
     \centering\small
@@ -103,7 +103,7 @@ Surprisingly, the generic translation of \texttt{sum} yields to a runtime even w
 
 This slowdown is apparently caused by the growth of the evaluation CTE. All previous results are accumulated there and each result adds all previous results to allow access to results from all earlier iterations. This behaviour makes the evaluation-CTE grow quadratically, even if the original function is linear.
 
-But this does not explain why the function performs worse than the quadratic, non-memoizable quicksort? The problem is caused by the wrong guess of the query planner about the number of rows returned from the scan of \texttt{callgraph}. During scenario-evaluation the CTE \texttt{e} (proxying \texttt{evaluation}) is joined with \texttt{callgraph} two times: Once for joining callsites with their results, here a hash join is used ($O(n+m)$, good). The other join is caused by the \texttt{NOT EXISTS} which is rewritten into a \texttt{LEFT JOIN}.
+But this does not explain why the function performs worse than the quadratic non-memoizable quicksort? The problem is caused by the wrong guess of the query planner about the number of rows returned from the scan of \texttt{callgraph}. During scenario-evaluation the CTE \texttt{e} (proxying \texttt{evaluation}) is joined with \texttt{callgraph} two times: Once for joining callsites with their results using a hash join ($O(n+m)$, good). The other join is caused by the \texttt{NOT EXISTS} which is rewritten into a \texttt{LEFT JOIN}.
 
 \begin{figure}[h!]
     \centering\scriptsize
@@ -123,15 +123,15 @@ But this does not explain why the function performs worse than the quadratic, no
     \label{plan:sum}
 \end{figure}
 
-The planner assumes that only a single row is returned from \texttt{callgraph} after filtering with \texttt{c.callsite\_id IN (1)} and chooses therefore to make a \textit{nested loop anti join}. Nested loop joins are a good choice if one table is small, because the runtime is $O(nm)$ \cite{}. But the UDF has only a single callsite, therefore the predicate is not selective at all and not one but all $n$ rows are returned. The working-table of evaluation has on average a size of $n/2$. Therefore, the join complexity is in $O(n^2)$ - for a single iteration. 
+The planner assumes that only a single row is returned from \texttt{callgraph} after filtering with \texttt{c.callsite\_id IN (1)} and therefore chooses to make a \textit{nested loop anti join}. Nested loop joins are a good choice if one table is small because the runtime is $O(nm)$ \cite{}. But the UDF has only a single callsite. Accordingly, the predicate is not selective at all and not one but all $n$ rows are returned. The working-table of evaluation has a size of $n/2$ on average. Thus the join complexity is in $O(n^2)$ - for a single iteration. 
 
-Evaluation of the callgraph happens in a level-wise fashion, one level per iteration. Recalling \autoref{}, the callgraph of a single recursive function is just a linked list so the depth of the callgraph is $n$. For quicksort the callgraph is a binary tree, so the depth is just $log_2(n)$. In sum, the generic translation of a single recursive functions increases complexity from $O(n)$ to $O(n^3)$.
+Evaluation of the callgraph happens in a level-wise fashion, one level per iteration. Recalling \autoref{} the callgraph of a single recursive function is just a linked list so the depth of the callgraph is $n$. For quicksort the callgraph is a binary tree hence the depth is just $log_2(n)$. In sum, the generic translation of a single recursive functions increases complexity from $O(n)$ to $O(n^3)$.
 
-Using the template for single recursion fixes this issue. The template does not accumulate all previous results in the current result and thus the working-table does not grow with $n$ but yields always only a single row. The size of \texttt{evaluation} remains linear.
+Using the template for single recursion fixes this issue. The template does not accumulate all previous results in the current result thus the working-table does not grow with $n$, but always yields only a single row. The size of \texttt{evaluation} remains linear.
 
-The original function starts out linear but slows down a bit for large inputs before exceeding stack size. The speedup by the optimized translation is roughly by factor 10, with no limitation by the maximum stack size.
+The original function starts out linear but slows down a bit for large inputs before exceeding stack size. The speedup by the optimized translation is roughly by factor 10 with no limitation by the maximum stack size.
 
-The tail recursive optimization speeds up performance constantly by the factor of approx. 2. This seems natural considering that \autoref{fig:split_sr_times} shows that the evaluation-CTE, which is omitted in the tail recursive template, accounts for ca. 40\% of the runtime.
+The tail recursive optimization speeds up performance constantly by the factor of approx. 2. This seems natural considering that \autoref{fig:split_sr_times} shows the evaluation-CTE, which is omitted in the tail recursive template, accounting for ca. 40\% of the runtime.
 
 \section{Template Optimizations}
 

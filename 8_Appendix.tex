@@ -3,145 +3,125 @@
 %\appendix 
 %\addcontentsline{toc}{chapter}{Anhang} 
 
-%%%%%%%%%%%%%%%%%%%%%%%%
-%%%%%%%%%%%%%%%%%%%%%%%%
-%%%%%%%%%%%%%%%%%%%%%%%%
 \chapter[Appendix]{Appendix}
 \phantomsection
-\section{Examples of Rule application}
-\subsection{\RWHEN-rule}
-\begin{prooftree}
-    \AxiomC{}\RightLabel{\scriptsize(base)}
-    \UnaryInfC{\lstinputlisting{snippets/rules/fib/03-case-when.sql}}
-    \AxiomC{}\RightLabel{\scriptsize(base)}
-    \UnaryInfC{\lstinputlisting{snippets/rules/fib/03-case-then.sql}}
-    \AxiomC{\vdots}\RightLabel{\scriptsize(else)}
-    \UnaryInfC{\lstinputlisting{snippets/rules/fib/03-case-else.sql}}
-    \RightLabel{\scriptsize(when)}
-    \TrinaryInfC{\lstinputlisting{snippets/rules/fib/02-case.sql}}
-\end{prooftree}
 
 \section{Usage of \texttt{twr}}
-\begin{figure}[h]
-    \centering\footnotesize
-\begin{verbatim}
-Usage: twr (-f FILE | -d DIR | -u FUNC | -a) [-c] [-r] [-p] [-n FNAME/SUFFIX]
-           [--user USER] [--password PASSWORD] [--host HOST] [--port PORT]
-           [--database DATABASE] [-o PATH] [--disable-optimizations|--no-opt]
-           [--disable-tail-recursion|--no-tr]
-           [--disable-single-recursion|--no-sr]
-           [--disable-constant-parameters|--no-cp] [-v] [-q|--quiet]
-  Optimize recursive User-Defined Functions for PostgreSQL.
-
-Available options:
-  -f FILE                  Translate a UDF from a file
-  -d DIR                   Translate UDFs that are given as single files in a
-                           folder
-  -u FUNC                  Translate an UDF by specifying the signature of an
-                           existing function, eg. fib(int)
-  -a                       Translate entire database. EXPERIMENTAL! Use with
-                           caution!
-  -c                       Persist translation to database
-  -r                       Replace existing function in database
-  -p                       Print translation(s) to stdout
-  -n FNAME/SUFFIX          Name or prefix (for directory/db translation) of the
-                           generated function.
-  --user USER              Postgres username, default is ENV[USER]
-  --password PASSWORD      Password for PostgreSQL user
-  --host HOST              Host of PostgreSQL
-  --port PORT              Port of PostgreSQL
-  --database DATABASE      Name of a PostgreSQL database, default is USER
-  -o PATH                  Create a file with the translated function.
-  --disable-optimizations,--no-opt
-                           Disable all optimizations
-  --disable-tail-recursion,--no-tr
-                           Do not use optimizations for tail recursion
-  --disable-single-recursion,--no-sr
-                           Do not use optimizations for single recursion
-  --disable-constant-parameters,--no-cp
-                           Disable optimizations for constant function
-                           parameters
-  -v                       Level of verbosity: -v = input/output info, -vv =
-                           translation summary, -vvv = detailed analysis output
-  -q,--quiet               No output
-  -h,--help                Show this help text
-\end{verbatim}
-    \caption{Usage of the Haskell implementation}
-\end{figure}
-
-\begin{figure}[h]
+\begin{figure}[h!]
     \centering
-    \footnotesize
-    \begin{lstlisting}
-Input:	q/fib.sql (fib(numeric))
-Warning: Udf from file has replaced existing function in database!
-
-Analysis summary:
-  Callsites:		2
-  Scenarios:		2
-  Unhashable Args:	[]
-  Return type:		Hashable
-
-Applyed optimizations:
-  [$\times] Template for single recursive functions
-  [$\times] Template for tail recursive functions
-  [$\times] Constant parameter removal: 
-
-### Analysis result: ###
-Name:              pg_proc.fib
-Return type:       TAtom "numeric" [$\checkmark$ hashable]
-Tail-Recursive:    $\times$
-Single-Recursion:  $\times$
-Arguments:
-  1) TAtom "numeric" [$\checkmark$ hashable]
-Constant Arguments:
-   - none -
-Callsites:
-  1) Param 1:
-        SELECT $\udfArg{1}$ - (1) 
-  2) Param 1:
-        SELECT $\udfArg{1}$ - (2) 
-Recursive Scenarios:
-  1) Callsites: 1, 2
-     Predicate:
-        SELECT NOT $\udfArg{1}$ <= (2) 
-     Query:
-        SELECT ((fib($\udfArg{1}$ - (1)))
-                +
-                (fib($\udfArg{1}$ - (2)))) :: numeric AS "case" 
-
-Basecase Scenarios:
-  1) Predicate:
-        SELECT $\udfArg{1}$ <= (2) 
-     Query:
-        SELECT (1) :: numeric AS "case" 
-        
-Output:	fib(numeric) to database
-    \end{lstlisting}
-    \caption{Verbose output when translating the Fibonacci function from file \texttt{q/fib.sql} and persisting to database.}
+    \input{snippets/cli.tex}
+    \caption{Usage of the Haskell implementation \texttt{twr}}
 \end{figure}
+
+\section{Exemplary analysis results utilizing different rules}
+\subsection{\REXPR-rule}
+\begin{figure}[h!]
+    \centering
+    \input{snippets/case_plus_case_udf.tex}
+    \caption{UDF \texttt{case\_plus\_case}, used to showcase application of the \REXPR-rule.}
+    \label{udf:case_plus_case}
+\end{figure}
+
+\begin{figure}[h!]
+    \centering
+    \input{snippets/case_plus_case_analysis_results.tex}
+    \caption{Analysis output of \autoref{udf:case_plus_case}, for demonstration of the \REXPR-rule (slightly beautified).}
+    \label{scenarios:case_plus_case}
+\end{figure}
+\FloatBarrier
+
+\subsection{\RSELECT-rule}
+\begin{figure}[h!]
+    \centering
+    \input{snippets/fib_cols_udf.tex}
+    \caption{UDF \texttt{fib\_cols}, used to showcase application of the \RSELECT-rule.}
+    \label{udf:fib_cols}
+\end{figure}
+
+\begin{figure}[h!]
+    \centering
+    \input{snippets/fib_cols_analysis_results.tex}
+    \caption{Analysis output of \autoref{udf:fib_cols}, for demonstration of the \RSELECT-rule (slightly beautified).}
+    \label{scenarios:fib_cols}
+\end{figure}
+\FloatBarrier
+
+\subsection{\RFROM-rule}
+\begin{figure}[h!]
+    \centering
+    \input{snippets/fib_from_udf.tex}
+    \caption{UDF \texttt{fib\_from}, used to showcase application of the \RFROM-rule.}
+    \label{udf:fib_from}
+\end{figure}
+
+\begin{figure}[h!]
+    \centering
+    \input{snippets/fib_from_analysis_result.tex}
+    \caption{Analysis output of \autoref{udf:fib_from}, for demonstration of the \RFROM-rule (slightly beautified).}
+    \label{scenarios:fib_from}
+\end{figure}
+
+\FloatBarrier
+\subsection{\RWHERE-rule}
+\begin{figure}[h!]
+    \centering
+    \input{snippets/sieve_udf.tex}
+    \caption{UDF \texttt{sieve} implementing the Sieve of Eratosthenes, used to showcase application of the \RWHERE-rule.}
+    \label{udf:sieve}
+\end{figure}
+
+\begin{figure}[h!]
+    \centering
+    \input{snippets/sieve_analysis_output.tex}
+    \caption{Analysis output of \autoref{udf:sieve}, for demonstration of the \RFROM-rule (slightly beautified).}
+    \label{scenarios:sieve}
+\end{figure}
+\FloatBarrier
+
+\subsection{\RCTE-rule}
+\begin{figure}[h!]
+    \centering
+    \input{snippets/fib_cte_analysis_results.tex}
+    \caption{UDF \texttt{case\_plus\_case}, used to showcase application of the \REXPR-rule.}
+    \label{udf:fib_cte}
+\end{figure}
+
+\begin{figure}[h!]
+    \centering
+    \input{snippets/fib_cte_analysis_results.tex}
+    \caption{Analysis output of \autoref{udf:case_plus_case}, for demonstration of the \RCTE- and \RWITH-rule (slightly beautified).}
+    \label{scenarios:fib_cte}
+\end{figure}
+\FloatBarrier
 
 \section{Example translations}
+
 \subsection{\texttt{fib}}
-\begin{figure}
-    \centering
+\begin{figure}[h!]
+    \centering\footnotesize
     \sqlcode{snippets/fib_callstack.sql}
     \caption{\texttt{callstack}-CTE as standalone query. Note that the UDF argument \texttt{\$1} is replaced with a SQL-variable \texttt{:n}}
     \label{fib:callstack_cte_complete}
 \end{figure}
-\subsection{\texttt{gcd} without optimization}
-\subsection{\texttt{gcd} with single recursion optimization}
-\subsection{\texttt{gcd} with tail recursive optimization}
-\subsection{\texttt{sieve} without optimization}
-\subsection{\texttt{sieve} with constant argument removal}
+
 \section{Conditional normalization}
-\section{Usage of \texttt{twr}, a Haskell implementation for PostgreSQL}
+\begin{figure}[h!]
+    \centering
 \sqlcode{appendix/conditional_normalization.sql}\label{sql:conditionals}
-\section{Evaluation}
-\begin{figure}
+    \caption{SQL-conditionals implemented by \texttt{CASE}-expressions.}
+    \label{conditional_normalization}
+\end{figure}
+
+\begin{figure}[h!]
     \centering
     \sqlcode{appendix/paramN.sql}
     \caption{UDFs with varying number of arguments used for \autoref{fig:paramN}}
     \label{udfs:paramN}
+\end{figure}
+
+\begin{figure}[h!]
+    \centering
+    \input{snippets/fib_analysis_output.tex}
+    \caption{Verbose output when translating the Fibonacci function from file \texttt{q/fib.sql} and persisting to database.}
 \end{figure}
 %%%%%%%%%%%%%%%%%%%%%%%%

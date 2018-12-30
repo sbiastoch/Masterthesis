@@ -1,0 +1,15 @@
+\begin{minted}{postgresql}
+CREATE FUNCTION fib_from(n NUMERIC)
+RETURNS NUMERIC AS $$
+SELECT
+  CASE
+    WHEN n <= 2 THEN 1
+    ELSE (
+      SELECT T.i + S.i
+      FROM
+        (SELECT fib_from(n - 1)) AS T(i),
+        (SELECT fib_from(n - 2)) AS S(i)
+     )
+END
+$$ LANGUAGE SQL;
+\end{minted}

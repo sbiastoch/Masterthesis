@@ -1,0 +1,47 @@
+\footnotesize
+\begin{lstlisting}[language={}]
+Input:	q/fib.sql (fib(numeric))
+Warning: Udf from file has replaced existing function in database!
+
+Analysis summary:
+  Callsites:		2
+  Scenarios:		2
+  Unhashable Args:	[]
+  Return type:		Hashable
+
+Applyed optimizations:
+  [$\times$] Template for single recursive functions
+  [$\times$] Template for tail recursive functions
+  [$\times$] Constant parameter removal: 
+
+### Analysis result: ###
+Name:              pg_proc.fib
+Return type:       TAtom "numeric" [$\checkmark$ hashable]
+Tail-Recursive:    $\times$
+Single-Recursion:  $\times$
+Arguments:
+  1) TAtom "numeric" [$\checkmark$ hashable]
+Constant Arguments:
+   - none -
+Callsites:
+  1) Param 1:
+        SELECT $\udfArg{1}$ - (1) 
+  2) Param 1:
+        SELECT $\udfArg{1}$ - (2) 
+Recursive Scenarios:
+  1) Callsites: 1, 2
+     Predicate:
+        SELECT NOT $\udfArg{1}$ <= (2) 
+     Query:
+        SELECT ((fib($\udfArg{1}$ - (1)))
+                +
+                (fib($\udfArg{1}$ - (2)))) :: numeric AS "case" 
+
+Basecase Scenarios:
+  1) Predicate:
+        SELECT $\udfArg{1}$ <= (2) 
+     Query:
+        SELECT (1) :: numeric AS "case" 
+        
+Output:	fib(numeric) to database
+\end{lstlisting}

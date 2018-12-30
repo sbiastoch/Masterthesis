@@ -1,0 +1,62 @@
+\begin{lstlisting}[language={},basicstyle=\scriptsize]
+### Analysis result: ###
+Name:              pg_proc.case_plus_case
+Return type:       TAtom "numeric" [$\checkmark$ hashable]
+Tail-Recursive:    $\times$
+Single-Recursion:  $\times$
+Parameter:
+  1) TAtom "numeric" [$\checkmark$ hashable]
+Constant Parameter:
+   - none -
+Callsites:
+  1) Param 1:
+        SELECT $\udfArg{1}$ - 2 
+  2) Param 1:
+        SELECT $\udfArg{1}$ - 3 
+  3) Param 1:
+        SELECT $\udfArg{1}$ - 1 
+  4) Param 1:
+        SELECT $\udfArg{1}$ - 1 
+  5) Param 1:
+        SELECT $\udfArg{1}$ - 2 
+  6) Param 1:
+        SELECT $\udfArg{1}$ - 1 
+  7) Param 1:
+        SELECT $\udfArg{1}$ - 3 
+Recursive Scenarios:
+  1) Callsites: 1
+     Predicate:
+        SELECT $\udfArg{1}$ < 1 AND (NOT $\udfArg{1}$ < 3 AND $\udfArg{1}$ < 4)
+     Query:
+        SELECT 1 + case_plus_case($\udfArg{1}$ - 2)
+
+  2) Callsites: 2
+     Predicate:
+        SELECT $\udfArg{1}$ < 1 AND (NOT $\udfArg{1}$ < 3 AND NOT $\udfArg{1}$ < 4)) 
+     Query:
+        SELECT 1 + (1 - (case_plus_case($\udfArg{1}$ - 3)))
+
+  3) Callsites: 3
+     Predicate:
+        SELECT NOT $\udfArg{1}$ < 1 AND $\udfArg{1}$ < 3
+     Query:
+        SELECT case_plus_case($\udfArg{1}$ - 1) + 2
+
+  4) Callsites: 4, 5
+     Predicate:
+        SELECT NOT $\udfArg{1}$ < 1 AND (NOT $\udfArg{1}$ < 3 AND $\udfArg{1}$ < 4) 
+     Query:
+        SELECT case_plus_case($\udfArg{1}$ - 1) + (case_plus_case($\udfArg{1}$ - 2))
+
+  5) Callsites: 6, 7
+     Predicate:
+        SELECT NOT $\udfArg{1}$ < 1 AND (NOT $\udfArg{1}$ < 3 AND NOT $\udfArg{1}$ < 4)
+     Query:
+        SELECT case_plus_case($\udfArg{1}$ - 1) + (1 - (case_plus_case($\udfArg{1}$ - 3))
+
+Basecase Scenarios:
+  1) Predicate:
+        SELECT $\udfArg{1}$ < 1 AND $\udfArg{1}$ < 3 
+     Query:
+        SELECT 1 + 2
+\end{lstlisting}
