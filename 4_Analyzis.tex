@@ -6,23 +6,25 @@
 % Adding CTEs
 % Post processing
 
-This chapter gives detailed insights of how a given query is sliced into its scenarios and predicates by presenting inference rules. Before each inference rule, I give an intuition of the idea first, before formalizing it.
+This chapter gives detailed insights on the way a given query is sliced into its different evaluation-scenarios by presenting inference rules. Before each inference rule, I give an insight into the idea before formalizing it.
 
-I begin with presenting a set of four rules that are required to translate most basic \CASE-expressions. The nonrecursive rules \RREC und \RBASE handle the base cases when the SQL-fragment is directly a recursive call resp. does not contain any call at all. Disassembling \CASE-expressions is the true core of the translation process as it is the origin of any scenario. Each \WHEN-\THEN~branch is processed step by step by the \RWHEN-rule and eventually the \ELSE-branch by the \RELSE-rule.
+I begin by presenting a set of four rules which are required to translate most basic \CASE-expressions. The nonrecursive rules \RREC and \RBASE handle the basecases if the SQL-fragment is directly a recursive call or does not contain any call at all. Disassembling \CASE-expressions is the true core of the translation process as it is the origin of any scenario. Each \WHEN-\THEN~branch is processed step by step by the \RWHEN-rule and eventually the \ELSE-branch by the \RELSE-rule.
 
-To translate expressions and whole queries four further rules are required that all boil down to a common idea. This idea is that functions have a number of recursive operands that can be translated independently from each other. The different combinations of argument-scenarios form different scenarios of the function itself. Functions in this context can not only be actual functions like \texttt{+}, \texttt{GREATEST} or \texttt{fib}), but also any syntactic construct (eg. \texttt{IS BETWEEN}, \texttt{INNER JOIN}, \texttt{UNION}) that can be understood as one computation step with independent arguments. This schema is also applicable for select- and from-clauses.
+To translate expressions and whole queries four further rules are required which all boil down to a common idea: Functions have a number of recursive operands that can be translated independently from each other. The different combinations of argument-scenarios form different scenarios of the function itself. Functions in this context can not only be actual functions like \texttt{+}, \texttt{GREATEST} or \texttt{fib}), but also any syntactic construct (eg. \texttt{IS BETWEEN}, \texttt{INNER JOIN}, \texttt{UNION}) which can be understood as one computation step with independent arguments. This scheme is also applicable for select- and from-clauses.
 
-Finally, we allow the use of CTEs that come with a couple of complexities. Due to CTEs, it is possible that a recursive SQL-fragment does not contain a callsite directly but indirect via referenced CTEs. Furthermore, CTEs can reference other CTEs so it is necessary to track CTE-dependencies and maintain a list of recursive CTEs while taking shadowing into account.
+Finally, we allow the use of CTEs coming with a couple of complexities. Due to CTEs, it is possible that a recursive SQL-fragment does not contain a callsite directly, but indirectly via referenced CTEs. Furthermore, CTEs can reference other CTEs thus it is necessary to track CTE-dependencies and maintain a list of recursive CTEs while at the same time taking shadowing into account.
 
-To retrieve the intermediate representation used by the templates, each scenario is augmented with additional information. Most notably, callsite-arguments are extracted from the surrounding query. I provide a set of inference rules that perform this task while handling CTE the same way as in the rules for scenario generation.
+To retrieve the intermediate representation used by the templates, each scenario is augmented with additional information. Most notably, callsite-arguments are extracted from the surrounding query. I provide a set of inference rules performing this task while handling CTEs the same way as in the rules for scenario generation.
+
+Generated queries usually contain a lot of trivial \texttt{SELECT}s and predicates include unnecessary \texttt{AND TRUE}. Most of the time, I simplified these queries for better readability. This could be easily done automatically.
 
 \section{Preliminaries}\label{approach}
 
 \subsection{Structural Operational Semantics}
 
-A Structural Operational Semantic is an abstract way to define program evaluation step by step. Formally stated, it defines relations between states of an abstract machine. A state $S = (E, c)$ consists of an environment $E$ and some "code" $c$. Relations define transitions between two states. The notation $S \rightarrow S'$ (read: "$S$ evaluates \textit{in one step} to $S'$") is so just a shorthand for $(S, S') \in \rightarrow$ where $\rightarrow$ is the relation. In my rules, the environment does not change during a rule application so we can shorten notation and write $E \vdash c \rightarrow c'$. \cite[Chapter 2]{semanticsWithApplications}
+A Structural Operational Semantic is an abstract way to define program evaluation step by step. Formally stated, it defines relations between states of an abstract machine. A state $S = (E, c)$ consists of an environment $E$ and some "code" $c$. Relations define transitions between two states. The notation $S \rightarrow S'$ (read: "$S$ evaluates \textit{in one step} to $S'$") is just a shorthand for $(S, S') \in \rightarrow$ where $\rightarrow$ is the relation. In my rules the environment does not change during a rule application so notations can be shortened and written (like:/e.g?) $E \vdash c \rightarrow c'$. \cite[Chapter 2]{semanticsWithApplications}
 
-A rule may have a number of \textit{premises} $p_1, p_2, \dots, p_n$ that must hold for the rule to be applicable. This premises are written on top of a line above the rule. This premises may include \textit{judgments} over transitions $T \rightarrow^* T'$, that depict that two states are element of the reflexive transitive closure of the relation, ie. that $T$ can be evaluated to $T'$.
+A rule may have a number of \textit{premises} $p_1, p_2, \dots, p_n$ that must hold for the rule to be applicable. These premises are written on top of a line above the rule and may include \textit{judgments} over transitions $T \rightarrow^* T'$ which depict that two states are element of the reflexive transitive closure of the relation, ie. that $T$ can be evaluated to $T'$.
 
 $$\quad(\textsc{name})\inferrule{
    p_1\\
@@ -33,11 +35,11 @@ $$\quad(\textsc{name})\inferrule{
     S \rightarrow S'
 }$$
 
-Evaluation happens by recursively applying transition rules from a starting state. Premises that include judgments causes a callstack to build up until an axiom returns eventually a result (right part of the arrow). In the context of analyzing queries, many premises analyze a part of the query and than wraps the result into its own structure.
+Evaluation happens by recursively applying transition rules from a starting state. Premises including judgments cause a callstack to build up until an axiom eventually returns a result (right part of the arrow). In the context of analyzing queries many premises analyze a part of the query and wrap the result into its own structure.
 
-The provided rules give deterministic evaluation steps, ie. at most one rule is applicable at a time. This makes the rules a bit more verbose, but simplifies implementation as no backtracking need to be implemented to find the applicable rule.
+The provided rules give deterministic evaluation steps, ie. at most one rule is applicable at a time. This makes those rules a bit verbose, but simplifies implementation as no backtracking needs to be implemented to find the applicable rule.
 
-In the case of the scenario analysis, the state is $(C, T, q, r)$. $C$ is a ordered set of tuples. $C[\{a, b\}]$ returns a subset of $C$ with elements with an alias of $a$ or $b$. The empty CTE-store is denoted as $\varnothing$. $T$ is a set of aliases of CTEs. $q$ is the input query and $r$ is the result of the analysis. $C$ and $T$ are taken as environment.
+In the case of the scenario analysis the state is $(C, T, q, r)$. $C$ is a ordered set of tuples. $C[\{a, b\}]$ returns a subset of $C$ with elements with an alias of $a$ or $b$. The empty CTE-store is denoted as $\varnothing$. $T$ is a set of aliases of CTEs. $q$ is the input query and $r$ is the result of the analysis. $C$ and $T$ are taken as environment.
 
 The analysis result $r$ is a tuple $(B, R)$ containing a set of nonrecursive (basecase) scenarios in $B$ and a set of recursive scenarios in $R$. Each scenario consists of a predicate $p$ and a query that represents a "slice" of the original UDF $q$. An analyzsis result with three scenarios could like this:
 $$
@@ -1076,70 +1078,92 @@ Removing unsued CTEs from the scenario-predicate would clutter the inference rul
 
 \section{Extraction of callsite-arguments}
 
-The callgraph-template requires the callsite-arguments as standalone queries for each scenario. Without CTEs, they can be directly cut from the callsite because we do not allow any row-references. But with CTEs, callsite arguments may contain a query referencing a CTE. Therefore, we must keep those CTEs from each query-level that are used by the callsite-argument.
+The callgraph-template requires the callsite-arguments as standalone queries for each scenario. Without CTEs, they can be directly cut from the callsite because we do not allow any outside row-references. But with CTEs, callsite arguments may contain a query referencing CTEs. Therefore, we must keep those CTEs from each query-level that are (directly or indirectly) used by the callsite-argument.
 
-I have formulated inference rules to perform this extraction. The input of the inference rules is the query of a scenario from the scenario analyzis. The result is a set of tuples containing the arguments for a callsite as stand-alone queries. The only environment is the CTE-store $C$.
+I have formulated inference rules to perform this extraction. From a query-fragment $q$ a set of tuples $(e_1, e_2, \dots, e_n)$ is derived. Each component $e_i$ of a tuple is a stand-alone version of a callsite-argument. The only environment is the CTE-store $C$, required to detach and reattach the CTEs analogious to the scenario analysis.
 
-The rules are rather simple thanks to the constraint that no row-references are allowed inside callsite arguments.Basically, they unwrap each layer of the query while keeping used CTEs. The two axioms result either an empty set if no callsite is within the subtree (\textsc{nocall}-rule) or adds the arguments to the result set (\textsc{call}-rule).
+When extracting callsite-arguments, referenced callsites are of no interest. It is just required to tell if a subtree contains directly a callsite whose arguments need to be extracted. Therefore the simple notion of containing a callsite, known from the beginning of the chapter, can be used.
 
-$$\quad(\textsc{call})\inferrule{
+$$\text{containsCallsite}_fn(e_i) = fn \sqsubset e$$
+
+The rules for argument extraction are rather simple thanks to the constraint that no row-references are allowed inside callsite arguments. Extracting a subexpression with row-references from a query would require more sophisticated rules.
+
+This way each rule basically just unwraps each layer of the query while special care is taken for CTEs. The two axioms result either in an empty set if no callsite contained in the subtree (\textsc{nocall}-rule) or adds the arguments to the result set (\textsc{call}-rule).
+
+\begin{equation*}
+    \inferrule{
 }{
     \varnothing \vdash fn_{rec}(e_1, e_2, ..., e_n) \rightarrow \{ (e_1, e_2, ..., e_n) \}
-}$$
-
-$$\quad(\textsc{nocall})\inferrule{
-\neg \text{fn} \sqsubset e
+}\quad(\footnotesize\textsc{call})
+\end{equation*}
+\\
+\begin{equation*}
+\inferrule{
+    \neg \text{containsCallsite}_{fn}(e)
 }{  
     \varnothing \vdash e \rightarrow \{\}
-}$$
+}\quad(\footnotesize\textsc{nocall})
+\end{equation*}
 
-Expressions, functions etc. are traversed, collecting results from the subtrees (\textsc{remove expr}-rule). The definition for "functions" $\oplus$ is the same as for the \REXPR-rule.
+Expressions, functions etc. can be simply traversed, collecting results from each subtree (\textsc{remove expr}-rule). The definition for "functions" $\oplus$ is the same as for the \REXPR-rule.
 
-$$\quad(\textsc{remove expr})\inferrule{
-    \exists i \in \{1, ...., n\}: \text{containsCallsite}(e_i)\\
-    \forall i \in \{1, ...., n\}: \varnothing \vdash e_i \rightarrow P_i
+\begin{equation*}
+    \inferrule{
+    \exists i \in \{1, ...., n\}: \text{containsCallsite}_{fn}(e_i)\\
+    \forall i \in \{1, ...., n\}: \varnothing \vdash e_i \rightarrow E
 }{
-    \varnothing \vdash \oplus_{1 \leq i \leq n} e_i \rightarrow \cup_{i \in \{1, ...., n\}} P_i
-}$$
+    \varnothing \vdash \oplus_{1 \leq i \leq n} e_i \rightarrow \cup_{i \in \{1, ...., n\}} E_i
+}\quad(\footnotesize\textsc{remove expr})
+\end{equation*}
 
-The \textsc{remove select}-rule traverse removes surrounding query if callsite is within \SELECT, because the value of the callsite-arguments must be invariant to the tables references in \FROM.
+The \textsc{remove select}-rule traverses each element of the select-list if the callsite(s) are located within the select-clause. The from- and where-clauses are discarded as the value of the callsite-arguments must be uncorrelated from the row-references declared in \FROM.
 
-$$\quad(\textsc{remove select})\inferrule{
-    \exists i \in \{1, ..., n\}: \text{containsCallsite}(s_i) \\
-    \forall i \in \{1, ..., n\}: \varnothing \vdash s_i \rightarrow P_i
+\begin{equation*}
+\inferrule{
+    \exists i \in \{1, ..., n\}: \text{containsCallsite}_{fn}(s_i) \\
+    \forall i \in \{1, ..., n\}: \varnothing \vdash s_i \rightarrow E_i
 }{
     \varnothing \vdash \SELECT ~s_1, ..., s_n ~\FROM~ f ~\WHERE~ w \rightarrow \\\\
-    \{(\SELECT~ e_1, ..., \SELECT ~e_k) | (e_1, ..., e_k) \in \cup_{i \in \{1, ..., n\}} P_i \}
-}$$
+    \{\big(\SELECT~ e_1, ..., \SELECT ~e_k\big) ~|~ (e_1, ..., e_k) \in \cup_{i \in \{1, ..., n\}} E_1 \}
+}\quad(\footnotesize\textsc{remove select})
+\end{equation*}
 
-Remove outer query if callsite is within FROM, because surrounding query is irrelevant for evaluation of subqueries in FROM.
-$$\quad(\textsc{remove from})\inferrule{
-    \forall i_j \in \{i_1, ...., i_m\} \subseteq \{1, ..., n\}: \text{containsCallsite}(f_{i_j})\\
-    \forall i_j \in \{i_1, ...., i_m\}: \varnothing \vdash f_{i_j} \rightarrow P_{i_j}
+The surrounding query can be removed if the callsites are located within the from-clause (\textsc{remove from}-rule).
+
+\begin{equation*}
+\inferrule{
+    \exists i \in \{1, ..., n\}: \text{containsCallsite}_{fn}(s_i) \\
+    \forall i \in \{1, ..., n\}: \varnothing \vdash t_i \rightarrow E_i
 }{
-    \varnothing \vdash \SELECT s \FROM a_1 \AS f_1 \otimes ... \otimes a_n \AS f_n \WHERE w \rightarrow \cup_{i \in \{1, ..., n\}} P_i
-}$$
+    \varnothing \vdash \SELECT~s~\FROM~t_1, t_2, \dots, t_n~\WHERE~ w \rightarrow \\\\
+    \cup_{i \in \{1, ..., n\}} E_i
+}\quad(\footnotesize\textsc{remove from})
+\end{equation*}
 
-Evaluate CTEs seperately, keeping previous CTEs that are referenced, in the case that there are callsites inside CTEs. Saving also every CTE to the CTE-store if they are references form the actual query.
-$$\quad(\textsc{remove cte})\inferrule{
-    \varnothing \vdash t_1 \rightarrow P \\
-    C[a_1 : (t_1, \deps(C, t_1))] \vdash \WITH a_2 \AS t_2, ..., a_n \AS t_n ~q \rightarrow P_w
+Yet not directly required for correct evaluation, unused CTEs are removed. Each CTE is temporarily moved to the CTE-store together with information about its dependencies, similar to the \RCTE-rule. Note that callsites can also occur directly in CTEs.
+
+\begin{equation*}
+\inferrule{
+    \varnothing \vdash t_1 \rightarrow E \\\\
+    C[a_1 : (t_1, \deps(C, t_1))] \vdash \WITH~ a_2 \AS t_2, ..., a_n \AS t_n ~q \rightarrow E_w
 }{
-    C \vdash \WITH a_1 \AS t_1, ..., a_n \AS t_n ~q \rightarrow \\\\
-    \{(\WITH [a_i \AS t_i]_{(a_i, t_i) \in C[\deps(e_1)]} ~e_1, ...,\\
-       \WITH [a_i \AS t_i]_{(a_i, t_i) \in C[\deps(e_m)]} ~e_m) | (e_1, ..., e_m) \in P\} \cup P_w
-}$$
+    C \vdash \WITH~ a_1 \AS t_1, ..., a_n \AS t_n ~q \rightarrow \\\\
+    E_w \cup E
+}\quad(\footnotesize\textsc{remove cte})
+\end{equation*}
 
+When all CTE-dependencies have been collected, those CTEs that are referenced by a callsite-argument are reattached.
 
-$$\quad(\textsc{remove with})\inferrule{
-    \varnothing \vdash q \rightarrow P
+\begin{equation*}\inferrule{
+    \varnothing \vdash q \rightarrow E
 }{
-    C \vdash \WITH q \rightarrow \\\\
-    \{(\WITH [a_i \AS t_i]_{(a_i, t_i) \in C[\deps(e)]} ~e_1, 
-       ...,
-       \WITH [a_i \AS t_i]_{(a_i, t_i) \in C[\deps(e_m)]} ~e_m)
-       | (e_1, ..., e_m) \in P\}
-}$$
-
-Callsites within aggregate-functions are forbidden by the restriction that there must be a static number of callsites. Looping through a table, evaluating a recursive call per row is not allowed.
+    C \vdash \WITH~ q \rightarrow \\\\
+    {\begin{tabular}[b]{L}
+    \big\{\big(\WITH~ [a_i \AS t_i]_{(a_i, t_i, \_) \in C[\deps(e)]} ~e_1, 
+       ~\dots~,
+       \WITH~ [a_i \AS t_i]_{(a_i, t_i, \_) \in C[\deps(e_m)]} ~e_m\big)\\
+       \phantom{\big\{}|~(e_1, ..., e_m) \in E\big\}
+   \end{tabular}}
+}\quad(\footnotesize\textsc{remove with})
+\end{equation*}
 

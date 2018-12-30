@@ -1,6 +1,6 @@
 \chapter{Optimizations}
 
-If certain characteristics of the UDF are detected, optimized translation templates can be chosen that exploit those characteristics. This may either improve performance or enables us to implement work-arounds for settings where the original templates are not applicable otherwise.
+If certain characteristics of the UDF are detected, optimized translation templates can be chosen which exploit those characteristics. This may either improve performance or enables us to implement work-arounds for settings where the original templates are not applicable otherwise.
 
 To make these optimizations no change in the scenario analysis is required. Instead, the scenarios of the UDF are tested for the properties and the results are included in the intermediate representation, so that the best template can be chosen.
 
@@ -36,7 +36,7 @@ The function that computed the length of the \textit{collatz-series} (\autoref{l
     \begin{minipage}[b]{.45\linewidth}
     \centering
     \sqlcode{snippets/collatz.sql}
-    \subcaption{UDf computing the length of the \textit{collatz-series} for a start number $\texttt{n} > 0$.}
+    \subcaption{UDF computing the length of the \textit{collatz-series} for a start number $\texttt{n} > 0$.}
     \label{lst:collatz_udf}
     \end{minipage}
     \begin{minipage}[b]{.5\linewidth}

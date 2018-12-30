@@ -83,42 +83,42 @@ Analysis summary:
   Return type:		Hashable
 
 Applyed optimizations:
-  [✗] Template for single recursive functions
-  [✗] Template for tail recursive functions
-  [✗] Constant parameter removal: 
+  [$\times] Template for single recursive functions
+  [$\times] Template for tail recursive functions
+  [$\times] Constant parameter removal: 
 
 ### Analysis result: ###
 Name:              pg_proc.fib
-Return type:       TAtom "numeric" [✔ hashable]
-Tail-Recursive:    ✗
-Single-Recursion:  ✗
+Return type:       TAtom "numeric" [$\checkmark$ hashable]
+Tail-Recursive:    $\times$
+Single-Recursion:  $\times$
 Arguments:
-  1) TAtom "numeric" [✔ hashable]
+  1) TAtom "numeric" [$\checkmark$ hashable]
 Constant Arguments:
    - none -
 Callsites:
   1) Param 1:
-        SELECT $1 - (1) 
+        SELECT $\udfArg{1}$ - (1) 
   2) Param 1:
-        SELECT $1 - (2) 
+        SELECT $\udfArg{1}$ - (2) 
 Recursive Scenarios:
   1) Callsites: 1, 2
      Predicate:
-        SELECT NOT $1 <= (2) 
+        SELECT NOT $\udfArg{1}$ <= (2) 
      Query:
-        SELECT ((fib($1 - (1)))
+        SELECT ((fib($\udfArg{1}$ - (1)))
                 +
-                (fib($1 - (2)))) :: numeric AS "case" 
+                (fib($\udfArg{1}$ - (2)))) :: numeric AS "case" 
 
 Basecase Scenarios:
   1) Predicate:
-        SELECT $1 <= (2) 
+        SELECT $\udfArg{1}$ <= (2) 
      Query:
         SELECT (1) :: numeric AS "case" 
         
 Output:	fib(numeric) to database
     \end{lstlisting}
-    \caption{Verbose output when translating the Fibonacci function from file \textit{q/fib.sql} and persisting to database.}
+    \caption{Verbose output when translating the Fibonacci function from file \texttt{q/fib.sql} and persisting to database.}
 \end{figure}
 
 \section{Example translations}

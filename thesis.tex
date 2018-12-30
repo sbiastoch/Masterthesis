@@ -15,6 +15,9 @@
 \usepackage{latexsym}
 \usepackage[margin=10pt,font=small,labelfont=bf]{caption}
 
+\usepackage{pifont}% http://ctan.org/pkg/pifont
+\newcommand{\cmark}{\ding{51}}%
+\newcommand{\xmark}{\ding{55}}%
 \usepackage[section]{placeins}
 \usepackage{multirow}
 \usepackage[table]{xcolor}
@@ -57,7 +60,7 @@
     basicstyle=\footnotesize\ttfamily,
     extendedchars=true
 }
-\newcommand{\udfArg}[1]{{\$#1}}
+\newcommand{\udfArg}[1]{{\ttfamily\$#1}}
 \usepackage{minted}
 \usemintedstyle{borland}
 \newmintedfile[sqlcode]{postgresql}{

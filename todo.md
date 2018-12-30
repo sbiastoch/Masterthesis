@@ -1,9 +1,6 @@
-- Related Work
 - Layout
-- update argument extraction for CTEs
 
 must haves:
-- intermediate representation, inkl. args?
 - Appendix translations/analyzation
 - Example translation without CTEs
 - Example translation with CTEs
@@ -16,3 +13,4 @@ nice to have:
 - macros: mention dot notation
 - cool tables
 - unify notation of callsite_id
+- constraint: "static number of callsites" to avoid tables? => not enforceable!
