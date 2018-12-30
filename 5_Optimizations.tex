@@ -82,7 +82,7 @@ SELECT ...
     \label{opt_sr_evaluation_cte}
 \end{figure}
 
-Furthermore, the rather complicated relational division, pivoting and filtering for evaluable scenarios (\autoref{macro:recursive_scenario_evaluation}) can be replaced by a much simpler query (\autoref{opt_sr_eval_scenario}). Because each scenario has only a single callsite, no grouping/partitioning is required to collect results of dependant callsites and to check whether all dependencies are available. If a result of the callsite is present, the scenario can be evaluated. What remains is basically a simple join (\autoref{opt_sr}).
+Furthermore, the rather complicated relational division, transposing and filtering for evaluable scenarios (\autoref{macro:recursive_scenario_evaluation}) can be replaced by a much simpler query (\autoref{opt_sr_eval_scenario}). Because each scenario has only a single callsite, no grouping/partitioning is required to collect results of dependant callsites and to check whether all dependencies are available. If a result of the callsite is present, the scenario can be evaluated. What remains is basically a simple join (\autoref{opt_sr}).
 
 \begin{figure}[h!]
     \centering

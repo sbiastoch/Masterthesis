@@ -84,7 +84,7 @@ The programmer usually uses conditionals to direct which scenario should be eval
 Recursive functions can be implemented in SQL in two ways: As User Defined Function (UDF) or as self-referential Common Table Expression (CTE) in \texttt{WITH RECURSIVE}-queries. UDFs are functions (actually procedures) as we know them: A function with a name, an argument list, a defined return type and a function body. Recursive CTEs are different, as they are no procedures with explicit arguments but self-referential queries of a specific structure.
 
 \subsection{Recursive User Defined Functions}
-Recursive functions can be created in PostgreSQL as UDFs. UDFs can be implemented in a wide range of languages but we consider only SQL-UDFs as we do not want to leave the SQL-world. Also there is a number of ways to specify arguments and add modifiers which are not used. For my thesis I assume just simple positional arguments without any modifiers (eg. \texttt{\$1}).
+Recursive functions can be created in PostgreSQL as UDFs. UDFs can be implemented in a wide range of languages but we consider only SQL-UDFs as we do not want to leave the SQL-world. PostgreSQL provides a number of different ways to specify arguments and add modifiers. For my thesis I just assume simple positional arguments without any modifiers (eg. \texttt{\$1}).
 
 \begin{figure}[h!]
     \centering

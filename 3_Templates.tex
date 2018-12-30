@@ -159,7 +159,7 @@ Callgraph growth ends as soon as no recursive scenario is applicable for any new
 
 \section{Callgraph evaluation}
 % Evaluation starts bottom up at the leaves of the callstack
-Evaluation starts bottom up from the leafs of the callgraph. Scenarios are evaluated by replacing their original arguments with references to the arguments from the callgraph (\autoref{macro:single_basecase}). Scenarios may depend on other scenarios that need to be evaluated first. If all dependencies of a scenario are evaluated, the scenario can be evaluated itself. Nonrecursive scenarios have no dependencies and can therefore be evaluated straight ahead. From those results of the base cases the evaluation continues. Eventually, the desired result can be selected.
+Evaluation starts bottom up from the leafs of the callgraph. Scenarios are evaluated by replacing their original arguments with references to the arguments from the callgraph (\autoref{macro:single_basecase}). Scenarios may depend on other scenarios that need to be evaluated first. If all dependencies of a scenario are evaluated, the scenario can be evaluated itself. Nonrecursive scenarios have no dependencies and can therefore be evaluated straight ahead. From those results of the basecases the evaluation continues. Eventually, the desired result can be selected.
 
 \begin{figure}[h!]\small
     \begin{minipage}[b]{.45\linewidth}\small
@@ -233,9 +233,9 @@ The subquery from \texttt{NOT IN} is executed for every row as a subquery while 
 
 \subsection{Recursive scenario evaluation}
 
-The evaluation of recursive scenarios follows the schema of the evaluation of nonrecursive scenarios, but is a bit more involved. Callsite-results must be collected per scenario to decide if the scenario is evaluable yet. Only if all callsites of a scneario are evaluated, the scenario can be evaluated itself.
+The evaluation of recursive scenarios follows the scheme of the evaluation of nonrecursive scenarios while being a bit more involved. Callsite-results must be collected per scenario to decide if the scenario is evaluable yet. Only if all callsites of a scenario are evaluated, the scenario can be evaluated itself.
 
-This operation resembles relational division $\texttt{S} \div \texttt{R}$: When dividing \texttt{S} by \texttt{R}, table \texttt{S} is grouped by the attributes that are not involved as join-attributes with \texttt{R}. The grouped columns from \textit{S} are returned, if every row in the group have found a join-partner from \texttt{S}. By dividing \texttt{callgraph} by \texttt{evaluation} (projecting away \texttt{callgraph.call\_site\_id}), we obtain only those input arguments that are evaluable, ie. have all required callsite-results available.
+This operation resembles relational division $\texttt{S} \div \texttt{R}$: When dividing \texttt{S} by \texttt{R} table \texttt{S} is grouped by the attributes that are not involved as join-attributes with \texttt{R}. The grouped columns from \textit{S} are returned if every row in the group has found a join-partner from \texttt{S}. By dividing \texttt{callgraph} by \texttt{evaluation} (projecting away \texttt{callgraph.call\_site\_id}) we obtain only those input arguments that are evaluable, ie. have all required callsite-results available.
 
 \begin{figure}[h!]\centering
   \sqlcode{snippets/relational_division.sql}
@@ -245,9 +245,9 @@ This operation resembles relational division $\texttt{S} \div \texttt{R}$: When 
 
 The difficulty is to collect those callsite-results. The intuitive approach is to add an \texttt{array\_agg(e.result)} to the relational division (\autoref{relational_division}) that collects the results per scenario. This works well as long as we do not allow arrays as arguments: \texttt{array\_agg} require all input arrays to have the same dimensionality.
 
-The solution is to avoid array aggregation and to "pivot" the groups instead: each callsite-result gets its own column. Pivoting is implemented by using window-functions and partitions together with \texttt{nth\_value} instead of \texttt{GROUP BY} and \texttt{array\_agg}. This way, we circumvent any constraints regarding arrays and avoid expensive aggregation.
+The solution is to avoid array aggregation and to transpose the groups instead: each callsite-result gets its own column. Transposing is implemented by using window-functions and partitions together with \texttt{nth\_value} instead of \texttt{GROUP BY} and \texttt{array\_agg}. This way we circumvent any constraints regarding arrays and avoid expensive aggregation.
 
-With this problem solved, evaluating a recursive scenario boiles down to replacing UDF-arguments and callsites with \texttt{callgraph}- resp. \texttt{evaluation}-references, similar to the evaluation of nonrecursive scenarios (\autoref{macro:single_basecase}). \autoref{macro:recursive_scenario_evaluation} gives a macro to evaluate a scenario utilizing the pivoting approach from above.
+With this problem solved, evaluating a recursive scenario boiles down to replacing UDF-arguments and callsites with \texttt{callgraph}- resp. \texttt{evaluation}-references, similar to the evaluation of nonrecursive scenarios (\autoref{macro:single_basecase}). \autoref{macro:recursive_scenario_evaluation} gives a macro to evaluate a scenario utilizing the transposing-approach mentioned above.
 
 \begin{figure}[h!]\small
     \centering
@@ -296,9 +296,9 @@ With this problem solved, evaluating a recursive scenario boiles down to replaci
     \caption{(continued)}
 \end{figure}
 
-The working-table in recursive CTEs contains only the rows from the previous iteration, which is a problem when evaluating. Take the evaluation of \texttt{fib} for example (see \autoref{fig:fib_callstack_graph}): Each recursive scenario depends on the results from the last (\texttt{fib(n-1)}) and the penultimate iteration (\texttt{fib(n-2)}). Standard recursive CTE-semantics allows only access to \texttt{fib(n-1)}.
+The working-table in recursive CTEs contains only the rows from the previous iteration which is a problem when evaluating. Take the evaluation of \texttt{fib} for example (see \autoref{fig:fib_callstack_graph}): Each recursive scenario depends on the results of the last (\texttt{fib(n-1)}) and the penultimate iteration (\texttt{fib(n-2)}). Standard recursive CTE-semantics allows only access to \texttt{fib(n-1)}.
 
-To work around this restriction, the working table is added to the actual result-rows in each iteration. If we choose this approach, the working-table will be never empty, evaluation would never end. Therefore we need to manually take care of returning the empty table when evaluation should stop. To achieve this, new rows are computed seperately in a CTE and used as guard to prevent addition of the previous results if the CTE contains no rows. \autoref{macro:evaluation_cte}, that shows the final \texttt{evaluation}-CTE, implements this approach.
+To work around this restriction, the working table is added to the actual result-rows in each iteration. If we choose this approach the working-table will never be empty, consequently evaluation would never end. Therefore we need to manually take care of returning the empty table when evaluation should stop. To achieve this, new rows are computed separately in a CTE and used as guards to prevent addition of the previous results if the CTE contains no rows. \autoref{macro:evaluation_cte} showing the final \texttt{evaluation}-CTE implementing this approach.
 
 \begin{figure}[h!]\centering
   \sqlcode{snippets/evaluation_cte.sql}
@@ -312,7 +312,7 @@ To work around this restriction, the working table is added to the actual result
 
 The previous section introduced the components required to start and continue evaluation of recursive scenarios. The final task is to select the result or to trigger an infinite loop if a setting is detected where the original UDF does not terminate, but the translation has.
 
-There are two ways how a recursive function may not terminate: Infinite recursion and looping calls. Infinite recursion leads always to new calls, never reaching a basecase, the callgraph is infinite. Each new call results in a new, different row that is added to the callgraph-table (\autoref{fig:infinite_callstack}). In this case, the translation does not terminate correctly, as the original.
+There are two possibilities for a recursive function to not terminate: Infinite recursion and looping calls. Infinite recursion always leads to new calls, never reaching a basecase: The callgraph is infinite. Each new call results in a new different row which is added to the callgraph-table (\autoref{fig:infinite_callstack}). In this case the translation does not terminate correctly, like the original.
 
 \begin{figure}[h!]\small
     \begin{minipage}[b]{.5\linewidth}
@@ -338,10 +338,10 @@ $\vdots$ & $\vdots$ & $\vdots$
     \subcaption{Callgraph of that function. Recursion without a basecase.}
     \label{fig:infinite_callstack_callstack}
     \end{minipage}
-    \caption{The function misses its basecase if called with an odd number like 3 and does not terminate. Every call leads to a new, different recursive call as call-arguments grow towards infinity.}\label{fig:infinite_callstack}
+    \caption{The function misses its basecase if called with an odd number like 3 and does not terminate. Every call leads to a new different recursive call as call-arguments grow towards infinity.}\label{fig:infinite_callstack}
 \end{figure}
 
-The other case is looping calls. Since we utilize memoization, redundant calls lead only to a single row in the callgraph-table and not to multiple identical rows. Thus, the callgraph-table is finite while the original callgraph is not. Therefore, our implementation would terminate while the original does not. To maintain the original UDf behaviour we need to detect this case and trigger an infinite loop manually.
+The other case is looping calls. Since we utilize Memoization redundant calls lead only to a single row in the callgraph-table and not to multiple identical rows. Thus the callgraph-table is finite while the original callgraph is not. Therefore our implementation would terminate while the original does not. To maintain the original UDF behaviour we need to detect this case and trigger an infinite loop manually.
 
 \begin{figure}[h!]\small
     \begin{minipage}[b]{.45\linewidth}
@@ -375,10 +375,10 @@ in\_n & result \\\hline
     \end{tabular}
     \subcaption{}\label{fig:some_loop_evaluation}
     \end{minipage}
-    \caption{a) UDF-body of a function \texttt{f} where only some part of the callstack causes a loop. b) The callstack is finit, due to memoization. c) Evaluation can start, because some basecases are present, but has not all results available to finish evaluation up to the original call-arguments \texttt{3}.}\label{fig:some_loop}
+    \caption{a) UDF-body of a function \texttt{f} where only some part of the callstack causes a loop. b) The callstack is finit, due to memoization. c) Evaluation can start because some basecases are present, but does not have all results available in order to finish evaluation up to the original call-arguments \texttt{3}.}\label{fig:some_loop}
 \end{figure}
 
-How is this situation detectable? If at least one path in the callgraph contains a loop, this path have no basecase where evaluation could start and thus evaluation will stop eventually without having evaluated the root-node. There is no row in the \textit{evaluation}-CTE containing a result for the original UDF-arguments. Instead of returning an empty table, an infinite loop is triggered (\autoref{fig:some_loop}).
+How is this situation detectable? If at least one path in the callgraph contains a loop this path has no basecase where evaluation could start and thus evaluation will stop eventually without having evaluated the root-node. There is no row in the \textit{evaluation}-CTE containing a result for the original UDF-arguments. Instead of returning an empty table an infinite loop is triggered (\autoref{fig:some_loop}).
 
 \begin{figure}[h!]
     \centering
