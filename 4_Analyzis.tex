@@ -26,14 +26,14 @@ A Structural Operational Semantic is an abstract way to define program evaluatio
 
 A rule may have a number of \textit{premises} $p_1, p_2, \dots, p_n$ that must hold for the rule to be applicable. These premises are written on top of a line above the rule and may include \textit{judgments} over transitions $T \rightarrow^* T'$ which depict that two states are element of the reflexive transitive closure of the relation, ie. that $T$ can be evaluated to $T'$.
 
-$$\quad(\textsc{name})\inferrule{
+$$\inferrule{
    p_1\\
    p_2\\
    \dots\\
    p_n
 }{
     S \rightarrow S'
-}$$
+}\quad\footnotesize{\textsc{(name)}}$$
 
 Evaluation happens by recursively applying transition rules from a starting state. Premises including judgments cause a callstack to build up until an axiom eventually returns a result (right part of the arrow). In the context of analyzing queries, many premises analyze a part of the query and wrap the result into its own structure.
 
@@ -66,7 +66,7 @@ Rules to analyze arbitrary queries would need to consider every single language 
 
 Functions in the grammar are stated in prefix-notation even if the actual function comes in the form of eg. \texttt{i IS BETWEEN a AND b}, \texttt{x[n]} or \texttt{a IN (<query>)}. Those syntactic details are not visible when represented as AST. All constructs that act like a function are considered a function during translation.
 
-\begin{figure}[H]
+\begin{figure}[h!]
     \begin{minted}{postgresql}
     <query>     ::= [ WITH (<query>) AS <tblAlias>[, ...] ]
                       SELECT <expr>  AS <colAlias>[, ...]
@@ -90,9 +90,11 @@ Functions in the grammar are stated in prefix-notation even if the actual functi
 %\subsection{No VOLATILE functions}
 %Without referential transparancy we cannot assume that two function calls within the same query return the same value, making it impossible to use memoization. Therefore, only UDFs markes as STABLE or IMMUTEABLE (38.7. Function Volatility Categories) are translateable.
 
-A query-fragment $q$ of an UDF named $fn$ \textit{contains a callsite} or \textit{is recursive} if the AST of $q$ contains a node with a call to the $fn$ itself or references a recursive table-variable. The latter is a bit involved (see \autoref{tracking_recursive_ctes}) so we use a simplified variant of $\hasCallsite$ for the beginning that does not take references into account:
+A query-fragment $q$ of an UDF named fn \textit{contains a callsite} or \textit{is recursive} if the AST of $q$ contains a node with a call to the $fn$ itself or references a recursive table-variable. The latter is a bit involved (see \autoref{tracking_recursive_ctes}) so we use a simplified variant of $\hasCallsite$ for the beginning that does not take references into account:
 
 $$\hasCallsite(e) = fn \sqsubset e$$
+
+Where $t' \sqsubset t$ means that a node $t'$ is present within the tree $t$.
 
 %The auxiliary function $\sigma_{\text{cols}}$ is used to pick columns from the store by name, eg. $\sigma_{a, t, p, r}(C)$ returns the entire store $\langle (a, t, p, r)_1, \dots, (a, t, p, r)_n \rangle$ and $\sigma_p(C) = \langle p_1, \dots, p_n \rangle$ all predicates in the store.
 
@@ -348,7 +350,7 @@ If a \CASE-expression is located in the \texttt{THEN}-part the inner expression 
 % arrows
 \draw[->] (p) -- (r1);
 \end{tikzpicture}
-    \caption{Nested \texttt{CASE} in the predicate.}
+    \caption{Nested \texttt{CASE} in the \texttt{THEN}-part.}
     \label{fig:case_nested_in_when}
 \end{figure}
 
@@ -406,7 +408,7 @@ The \RWHEN-rule works branch by branch. It is only applicable if not both, the p
 The last premise analyzes the remaining branches for those scenarios where the predicate is nonrecursive (from $B_p$). The predicate of the remaining branches is thus prepended to the (positive) predicate of the predicate $p_p$ and the negated actual predicate $p'$. The scenarios of later branches are added by the actual rule to the set of non-/recursive scenarios.
 
 \begin{figure}[h!]
-    \centering\small
+    \centering\footnotesize
 
   \makebox[\textwidth][c]{$$\inferrule{
     \neg (\hasCallsite(T, p) \land \hasCallsite(T, bs))\\\\
@@ -423,7 +425,7 @@ T, C \vdash (p_0, \CASE~ \WHEN ~p ~\THEN ~e ~bs ~\END) \rightarrow \\
 \end{tabular}}
 }\quad(\textsc{when})$$}
     \caption{\RWHEN-rule to slice \texttt{CASE}-expressions into its different evaluation scenarios.}
-    \label{fig:my_label}
+    \label{rule:when}
 \end{figure}
 
 The actual rule combines all sources of scenarios. The basecase scenarios (first component of the tuple) are built by combining all nonrecursive predicates ($B_p$) with the nonrecursive resulting expressions ($B_e$). This set of scenarios is unioned with the $n$ sets of scenarios of the other branches $(B_i, R_i)$ (remember $n$ is the number of nonrecursive predicate-scenarios).
@@ -504,17 +506,17 @@ The \REXPR-rule formalizes this idea (\autoref{rule:expr}). $\oplus$ is used as 
 
 \begin{figure}[h!]
     \centering
-$$\inferrule{
-    \exists i \in \{1, ..., n\}: T \vdash \hasCallsite(e_i)\\
+  \makebox[\textwidth][c]{$$\inferrule{
+    \exists i \in \{1, ..., n\}: \hasCallsite(T, e_i)\\
     \forall i \in \{1, ..., n\}: T, C \vdash (\TRUE, e_i) \rightarrow (B_i, R_i)
 }{
     T, C \vdash (p, \oplus_{1\leq i \leq n} e_i) \rightarrow \\\\
     {\begin{tabular}[b]{L}
-                 \Big( \Big\{(p ~\AND~ (\AND_{1\leq i \leq n} p_i)), \oplus_{1\leq i \leq n} e_i'           ~|~~ ((p_1, e_1'), ..., (p_n, e_n')) \in \times_{\{i|1\leq i \leq n\}} \phantom{(}B_i~~~~~~~~~\Big\}, \\
-        \phantom{\Big(}\Big\{(p ~\AND~ (\AND_{1\leq i \leq n} p_i)), \oplus_{1\leq i \leq n} e_i\phantom{'} ~|~~ ((p_1, e_1'), ..., (p_n, e_n')) \in \times_{\{i|1\leq i \leq n\}} (B_i \cup R_i),\\
-        \hspace*{58mm}\exists e \in \{e'_1, ..., e'_n\} : \hasCallsite(T, e)~~~~~~~~~~~\Big\}~\Big)
+                 \Big( \big\{(p ~\AND~ (\AND_{1\leq i \leq n} p_i)), \oplus_{1\leq i \leq n} e_i'           ~|~~ ((p_1, e_1'), ..., (p_n, e_n')) \in \times_{\{i|1\leq i \leq n\}} \phantom{(}B_i~~~~~~~~~\big\}, \\
+        \phantom{\Big(}\big\{(p ~\AND~ (\AND_{1\leq i \leq n} p_i)), \oplus_{1\leq i \leq n} e_i ~|~~ ((p_1, e_1'), ..., (p_n, e_n')) \in \times_{\{i|1\leq i \leq n\}} (B_i \cup R_i),\\
+        \hspace*{65mm}\exists e \in \{e'_1, ..., e'_n\} : \hasCallsite(T, e)~~~~~~~~~\big\}~\Big)
     \end{tabular}}
-}\quad(\textsc{expr})$$
+}\quad(\textsc{expr})$$}
     \caption{\REXPR-rule}
     \label{rule:expr}
 \end{figure}
@@ -530,7 +532,7 @@ As of now, there are three different rules to analyze callsites in each clause o
 \begin{figure}[h!]
     \centering
     \input{tikz/expr-select.tex}
-    \caption{The projection of a relation happening inside \SELECT~can be understood as a function $\SELECT(e_1, \dots, e_n, T)$. The same happens analogously for the \FROM-clause: $\FROM(T_1, \dots, T_m)$}
+    \caption{The projection of a relation happening inside \SELECT~can be understood as a function as well as \FROM-clause.}
     \label{fig:expr-select}
 \end{figure}
 
@@ -539,7 +541,7 @@ The idea of analyzing queries with callites in the select-list follows directly 
 The inference rule (\autoref{rule:select}) is nearly identical to the \REXPR-rule. Only additional premises enforce the constraints stated above. Furthermore, the "function" representing the query is not entirely analyzed, only the \texttt{SELECT}-clause is. Other clauses do not contain callsites and would lead to the application of the \RBASE-rule leaving them unchanged.
 
 \begin{figure}[h!]
-    \centering\footnotesize
+    \centering\scriptsize
   \makebox[\textwidth][c]{
 $$\inferrule{
     \exists i \in \{1, ..., n\}: T \vdash \hasCallsite(e_i) \\
@@ -551,7 +553,7 @@ $$\inferrule{
     {\begin{tabular}[b]{L}
              \Big( \big\{\big(\SELECT~ p ~\AND~ p_1 ~\AND~ \cdots ~\AND~ p_n, ~\SELECT~ e'_1, ..., e'_n ~\FROM ~ts~\WHERE ~w \big) | ~((p_1, e'_1), ..., (p_n, e'_n)) \in \times_{1 \leq i \leq n} B_i~~~~~~~~~\big\}, \\
     \phantom{\Big(}\big\{\big(\SELECT~ p ~\AND~ p_1 ~\AND~ \cdots ~\AND~ p_n,~ \SELECT~ e'_1, ..., e'_n ~\FROM ~ts~ \WHERE~w \big) | ~((p_1, e'_1), ..., (p_n, e'_n)) \in \times_{1 \leq i \leq n} (B_i \cup R_i),\\
-    \hspace{104mm}\exists e \in \{e'_1, ..., e'_n\} : \hasCallsite(T, e)~~~~~~\big\}\Big)\\
+    \hspace{96mm}\exists e \in \{e'_1, ..., e'_n\} : \hasCallsite(T, e)~~~~~~\big\}\Big)\\
     \end{tabular}}
 }
 \quad(\textsc{select})$$}
@@ -565,7 +567,7 @@ $$\inferrule{
 A recursive \texttt{FROM}-clause works analogously, the \RFROM-rule is nearly identical to the \RSELECT-rule (\autoref{rule:from}). Instead of the \texttt{SELECT}-list the \texttt{FROM}-list is analyzed. Other parts of the query cannot contain callsites thus are left unchanged.
 
 \begin{figure}[h!]
-    \centering\footnotesize
+    \centering\scriptsize
   \makebox[\textwidth][c]{
 $$\inferrule{
     \exists i \in \{1, ..., n\}: T \vdash \hasCallsite(e_i) \\
@@ -577,7 +579,7 @@ $$\inferrule{
     {\begin{tabular}[b]{L}
              \Big( \big\{\big(\SELECT~ p ~\AND~ p_1 ~\AND~ \cdots ~\AND~ p_n, ~\SELECT ~ts~ \FROM ~e'_1, ..., e'_n~\WHERE ~w \big) | ~((p_1, e'_1), ..., (p_n, e'_n)) \in \times_{1 \leq i \leq n} B_i~~~~~~~~~\big\}, \\
     \phantom{\Big(}\big\{\big(\SELECT~ p ~\AND~ p_1 ~\AND~ \cdots ~\AND~ p_n,~ \SELECT ~ts~ \FROM ~e'_1, ..., e'_n~ \WHERE~w \big) | ~((p_1, e'_1), ..., (p_n, e'_n)) \in \times_{1 \leq i \leq n} (B_i \cup R_i),\\
-    \hspace{104mm}\exists e \in \{e'_1, ..., e'_n\} : \hasCallsite(T, e)~~~~~~\big\}\Big)\\
+    \hspace{96mm}\exists e \in \{e'_1, ..., e'_n\} : \hasCallsite(T, e)~~~~~~\big\}\Big)\\
     \end{tabular}}
 }
 \quad(\textsc{from})$$}
@@ -680,7 +682,7 @@ $
 
 \fi
 
-\subsection{Examples}
+Examples for different UDFs utilizing each of the introduced rules are provided in the appendix (\autoref{appendix:analyzes}).
 
 
 \section{Handling CTEs}
@@ -728,7 +730,7 @@ CTEs may contain callsites and therefore need to be analyzed as well. They are p
 Whenever a query-fragment which references a CTE from $T$ is encountered we know this fragment to be recursive. This way we can build up $T$ incrementally and do not need to track each reference recursively back to its declaration in order to find out whether it is recursive. As an example see \autoref{fig:tracking_recursive_ctes}.
 
 \begin{figure}[h]
-    \small
+    \footnotesize
     \centering
     \begin{tikzpicture}[x=8mm, y=8mm]
     \node at (0.5, 1) {\footnotesize{(a)}};
@@ -979,7 +981,7 @@ Removing unsued CTEs from the scenario-predicate would clutter the inference rul
 %1) The actual query is analyzed, resulting in nonrecursive scenarios $B$ resp. $R$. 2) For the given scenario, the CTEs referenced by the query $q'$ are looked up from ($C[\deps_q(q')]$) and prepended to the resulting scenario-query. 3) All CTEs, referenced either by scenario-queries or scenario-predicates, are retrieved ($C[\deps_q(q') \cup \deps_p(p')]$) and their predicates ($p_1, ..., p_k$) are added to the resulting scenario-predicate. 4) As each predicate may include again references to CTEs, these references $dp_1, \dots,  dp_k$ are used to retrieve the CTE required to evaluate the scenario-predicate ($C[dp_1 \cup \dots \cup dp_k]$).
 
 \begin{figure}[h!]
-    \centering
+    \centering\small
 \makebox[\textwidth][c]{$$\inferrule{
     C \neq \varnothing\\
     T, \varnothing \vdash (p, q) \rightarrow (B, R)
@@ -1114,7 +1116,9 @@ Yet not directly required for correct evaluation, unused CTEs are removed. Each 
 
 When all CTE-dependencies have been collected those CTEs which are referenced by a callsite-argument are reattached.
 
-\begin{equation*}\inferrule{
+\begin{equation*}
+\small
+\inferrule{
     \varnothing \vdash q \rightarrow E
 }{
     C \vdash \WITH~ q \rightarrow \\\\

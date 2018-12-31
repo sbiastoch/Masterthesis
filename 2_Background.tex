@@ -24,16 +24,16 @@ Due to their declarative nature, SQL-Queries are no executable programs by thems
 Parsing text into an AST is a standard step in compilation because ASTs are much more suitable to work with \cite[p. 5]{dragenbook}. My implementation uses two great libraries that were internally developed at WSI Tübingen to receive and pretty-print a sanitized AST from a SQL-query \cite{denis_hirn, peter_richter}.
 
 \begin{figure}[h!]
-    \centering\footnotesize
-    \begin{tikzpicture}[level distance=1cm,level 1/.style={sibling distance=2cm},level 2/.style={sibling distance=1cm}, every node/.style = {shape=circle, draw, align=center, minimum width=7mm, minimum height=7mm}]]
+    \centering
+    \begin{tikzpicture}[level distance=15mm,level 1/.style={sibling distance=30mm},level 2/.style={sibling distance=15mm}, every node/.style = {shape=circle, draw, align=center, minimum width=10mm, minimum height=10mm}]]
     \node {\texttt{+}}
-        child { node{\texttt{fib}}
+        child { node{\footnotesize\texttt{fib}}
             child { node {\texttt{-}}
                 child { node {n} }
                 child { node {1} }
             }
         }
-        child { node{\texttt{fib}}
+        child { node{\footnotesize\texttt{fib}}
             child { node {\texttt{-}}
                 child { node {n} }
                 child { node {2} }
@@ -108,13 +108,13 @@ Under certain circumstances, PostgreSQL can optimize some function calls. Very s
 
 \begin{figure}[h!]
     \centering
-    \begin{minted}{postgresql}
+    \begin{cminted}{postgresql}
 CASE WHEN ($1 = 1) THEN 1
      ELSE ($1 * CASE WHEN (($1 - 1) = 1) THEN 1
                      ELSE (($1 - 1) * fac(($1 - 1) - 1))
                 END)
 END
-    \end{minted}
+    \end{cminted}
     \caption{The query-body of \texttt{fac} after the planner has inlined the call to \texttt{fac(\$n - 1)}.}
     \label{fig:inlining}
 \end{figure}
@@ -132,20 +132,20 @@ Common Table Expressions (CTEs) are a convenient way to define auxiliary queries
 
 \begin{figure}[h!]
     \centering
-    \begin{minted}{postgresql}
+    \begin{cminted}{postgresql}
 WITH RECURSIVE T(i, v) AS (
  SELECT 1, 1
    UNION ALL
  SELECT i + 1, v * (i + 1) FROM T WHERE i < 10
 )
 SELECT v FROM T WHERE i = 10;
-    \end{minted}
+    \end{cminted}
     \caption{Calculation of $10!$ using a self-referential CTE.}
-    \label{fig:my_label}
+    \label{example:rcte}
 \end{figure}
 
 
-CTEs also exist in a "recursive" variant which makes SQL queries much more expressive. Actually, since the introduction of recursive CTEs in SQL:1999, queries are turing-complete. Every intuitively computable function can be expressed as a SQL-query. PostgreSQL supports this feature since Version 8.4 (2009) \cite[p. 2811]{psql}. Implementations in PostgreSQL for turing-machines and cyclic tag systems exist demonstrating this property \cite{psqlWikiCTS, psqlWikiTM}.
+CTEs also exist in a "recursive" variant which makes SQL queries much more expressive (\autoref{example:rcte}). Actually, since the introduction of recursive CTEs in SQL:1999, queries are turing-complete. Every intuitively computable function can be expressed as a SQL-query. PostgreSQL supports this feature since Version 8.4 (2009) \cite[p. 2811]{psql}. Implementations in PostgreSQL for turing-machines and cyclic tag systems exist demonstrating this property \cite{psqlWikiCTS, psqlWikiTM}.
 
 However, recursive functions need to be implemented in a special style using self-referential CTEs inside \texttt{WITH RECURSIVE}-queries. This constraints origin by the fact that they are actually evaluated iteratively. Each self-referential CTE consist of a \texttt{UNION} or \texttt{UNION ALL} dividing the starting query from the "recursive" query. The recursive query contains a reference to the CTE itself. Evaluation happens in a iterative fashion: In each iteration the self-reference points to a \textit{working table} containing the results from the previous iteration. When using the variant with \texttt{UNION} each iteration returns only (globally) new rows. The rows of each iteration are added to the result of the CTE.
 

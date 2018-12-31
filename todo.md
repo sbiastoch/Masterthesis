@@ -1,14 +1,24 @@
-must haves:
-- fix final optimizations section!!!
-- Layout
-- OS:judgements?
+fix plots:
 - fix fib plot
-- check for question marks
-- check citations
+- fix optimizations tr/sr layout (+ exmaple?)
+- relational division formatting & referenced in text
+- ...
+
+fix text:
+- OS:judgements?
+- fix final optimizations section??
+- each figure referenced in text?
+
+final check:
+- question marks
+- citations
 
 nice to have:
 - SR: collatz durch fac ersetzen
-- macros: mention dot notation
 - cool tables
-- unify notation of callsite_id
+- 
+
+text improvements:
+- macros: mention dot notation
 - constraint: "static number of callsites" to avoid tables? => not enforceable!
+- unify notation of callsite_id

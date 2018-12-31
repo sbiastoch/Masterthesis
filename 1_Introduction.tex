@@ -50,16 +50,16 @@ What happens if we call \mintinline{postgresql}{SELECT fib(4)}? The planner take
 
 
 \begin{figure}[h!]
-    \begin{minipage}[b]{.45\linewidth}
+    \begin{minipage}[b]{.38\linewidth}
     \centering\large
     \sqlcode{snippets/fib_wide.sql}
-    \vspace{8mm}
+    %\vspace*{8mm}
     \subcaption{SQL UDF returning the nth Fibonacci number}
     \label{intro_fib}
     \end{minipage}\hfill
-    \begin{minipage}[b]{.45\linewidth}
+    \begin{minipage}[b]{.5\linewidth}
     \centering\small
-    \vspace{-8mm}
+    %\vspace*{-8mm}
     \input{snippets/fib_intermediate.tex}
     \subcaption{Recursive scenarios}\label{fib_rec_scenarios}
     \end{minipage}
@@ -70,7 +70,7 @@ What happens if we call \mintinline{postgresql}{SELECT fib(4)}? The planner take
 \begin{figure}[h]
 \centering
 \input{snippets/tbl_callgraph.tex}
-\caption{}\label{tbl:callgraph}
+\caption{Callgraph-table}\label{tbl:callgraph}
 \end{figure}
 
 % Callgraph creation

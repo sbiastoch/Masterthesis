@@ -1,5 +1,5 @@
-{\small
-\begin{tikzpicture}[x=5mm, y=5mm]
+{\footnotesize
+\begin{tikzpicture}[x=6mm, y=5mm]
 \node      at ( 8, 9) {$\SELECT$};
 \node (e1) at (10, 9) {$\highlight[red!15]{e_1}$};
 \node      at (11, 9) {$,$};
@@ -27,16 +27,16 @@
 
 \node (e31) at (18, 4) { 
     \begin{tabular}{|p{1em}|r|c|}\hline
-    \cellcolor{gray!25} & $\highlight[yellow!15]{\TRUE}$ & $\highlight[yellow!15]{e_3}$\\\hline
+    \cellcolor{gray!25} & \cellcolor{yellow!15}$\TRUE$ & \cellcolor{yellow!15}$e_3$\\\hline
     \end{tabular}
 };
 
-\node (r1) at (12, 1) {
+\node (r1) at (12, 0) {
     \begin{tabular}{|p{1em}|r|c|}\hline
     \cellcolor{gray!25}  & $\SELECT ~ \highlight[red!15]{\TRUE} ~\AND~ \highlight[green!15]{p_{2,1}} ~\AND~ \highlight[yellow!15]{\TRUE}$ & $\SELECT~ \highlight[red!15]{e_1}, \highlight[green!15]{r_{2,1}}, \highlight[yellow!15]{e_3} ~ \FROM \dots$\\\hline
     \end{tabular}
 };
-\node (r2) at (12, 0) {
+\node (r2) at (12, -1.25) {
     \begin{tabular}{|p{1em}|r|c|}\hline
     \cellcolor{gray!25} $\ast$ & $\SELECT ~ \highlight[red!15]{\TRUE} ~\AND~ \highlight[green!15]{p_{2,2}} ~\AND~ \highlight[yellow!15]{\TRUE}$ & $\SELECT~ \highlight[red!15]{e_1}, \highlight[green!15]{r_{2,2}}, \highlight[yellow!15]{e_3} ~ \FROM \dots$\\\hline
     \end{tabular}
@@ -48,7 +48,7 @@
 \draw (e11.355) to (e22.west);
 \draw (e21.east) to (e31.175);
 \draw (e22.east) to (e31.185);
-\draw[=>] (e22.south) -- (r1.north);
+\draw[<-] (r1.north) to +(0, 1.5);
 %\draw[->] (e31.355) -- (r2.west);
 %\draw[->, bend left=20]  (e11.north) to (e21.north) to (e31.north) to (r1.west);
 %\draw[->, bend right=20] (e11.south) to (e22.south) to (e31.south) to (r2.west);

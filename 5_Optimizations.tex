@@ -32,7 +32,7 @@ Single recursive functions are a subgroup of general recursive functions. They h
 The function that computed the length of the \textit{collatz-series} (\autoref{lst:collatz_udf}) is an example for a single recursive function.
 
 \begin{figure}[h]
-    \centering
+    \centering\footnotesize
     \begin{minipage}[b]{.45\linewidth}
     \centering
     \sqlcode{snippets/collatz.sql}
@@ -40,7 +40,7 @@ The function that computed the length of the \textit{collatz-series} (\autoref{l
     \label{lst:collatz_udf}
     \end{minipage}
     \begin{minipage}[b]{.5\linewidth}
-    \centering\scriptsize
+    \centering\ssmall
         \begin{tabular}{|p{1em}|p{3.3cm}|p{2.9cm}|}\hline
         \cellcolor{gray!25} & \texttt{\phantom{NOT }n=1} & \texttt{1}\\\hline
         \end{tabular}
@@ -95,7 +95,7 @@ Furthermore, the rather complicated relational division, transposing and filteri
 
 \section{Tail Recursion}
 
-\begin{wrapfigure}{r}{0.5\textwidth}
+\begin{wrapfigure}{r}{0.6\textwidth}
   \vspace{-10pt}
     \sqlcode{snippets/collatz_tr.sql}
   \caption{Tail recursive formulation of \texttt{collatz}}
@@ -104,18 +104,33 @@ Furthermore, the rather complicated relational division, transposing and filteri
 
 A special form of single recursive functions are tail recursive functions. They do not have any evaluation context around any callsite. Therefore, each recursive scenario just returns another recursive call. Eventually, the result of the basecase is just passed all the way up in the callgraph to the root without any modifications. Hence, this last phase can be skipped, meaning no \texttt{evaluation}-CTE is required.
 
-The final result is present in the \texttt{basecase}-CTE. The basecase-CTE contains only a single value because single recursive functions have no branches in the callgraph (cp. \autoref{tr_callgraph}). The modifications on the template amount to removing the \texttt{evaluation}-CTE and changing result selection as shown in \autoref{tr_opt_template}. Furthermore, the \texttt{callsite\_id}-column can be removed from the \texttt{callgraph}-CTE because the only use of the \texttt{callsite\_id} is to identify the corresponding scenario during evaluation, which now is omitted (\autoref{marco:collect_call_maybe_optimized}).
-
-\begin{figure}
+\begin{figure}[h!]
     \centering
-    \sqlcode{snippets/opt_tr.sql}
+    \begin{cminted}{postgresql}
+WITH RECURSIVE
+    callgraph AS (
+      ((SELECT NULL, $1)
+         UNION ALL ... -- unchanged
+      ) UNION ... -- unchanged
+    ),
+    basecases AS (...), -- unchanged
+    -- no evaluation
+    loop      AS (...)  -- unchanged
+SELECT
+  COALESCE(
+    (SELECT b.result FROM basecases b),
+    (SELECT DISTINCT NULL::<return type> FROM loop)
+  )
+    \end{cminted}
     \caption{Template for tail recursive UDFs. No \texttt{evaluation}-CTE is required anymore as all the basecases already return the final result.}
     \label{tr_opt_template}
 \end{figure}
 
 
+The final result is present in the \texttt{basecase}-CTE. The basecase-CTE contains only a single value because single recursive functions have no branches in the callgraph (cp. \autoref{tr_callgraph}). The modifications on the template amount to removing the \texttt{evaluation}-CTE and changing result selection as shown in \autoref{tr_opt_template}. Furthermore, the \texttt{callsite\_id}-column can be removed from the \texttt{callgraph}-CTE because the only use of the \texttt{callsite\_id} is to identify the corresponding scenario during evaluation, which now is omitted (\autoref{marco:collect_call_maybe_optimized}).
+
 \begin{figure}[h!]\centering\small
-    \begin{minted}{postgresql}
+    \begin{cminted}{postgresql}
     <collect_call_maybe_tr(in_arg_1, predicate, callsite)>
         := SELECT
              in_arg_1                    AS in_1, 
@@ -123,36 +138,37 @@ The final result is present in the \texttt{basecase}-CTE. The basecase-CTE conta
              callsite.arg_1[in_arg_1/$1] AS out_1
            FROM predicate AS p(is_true)
            WHERE p.is_true
-    \end{minted}
+    \end{cminted}
   \caption{Pseudocode to generate a single call to the callstack-table, optimized for tail recursive UDFs. The callsite id is no longer required as the evaluation-phase is skipped.}
   \label{marco:collect_call_maybe_optimized}
 \end{figure}
 
-To test whether an UDF is tail recursive all its scenarios must be tail recursive. This means that the context of the only callsite \texttt{f(...} must be present at the top level of the query or nested in trivial \texttt{SELECT}s. Any computations like \texttt{1+(SELECT f(n))} would create a computation context around the call needing to be evaluated.
+To test whether an UDF is tail recursive all its scenarios must be tail recursive. This means that the context of the only callsite \texttt{f(...)} must be present at the top level of the query or nested in trivial \texttt{SELECT}s. Any computations like \texttt{1+(SELECT f(n))} would create a computation context around the call needing to be evaluated.
 
-\begin{figure}
+\begin{figure}[h!]
     \centering
-\begin{minted}{postgresql}
+\begin{cminted}{postgresql}
 q := f(...)
 q := (SELECT <q>)
 q := (WITH [<alias> AS (<nonrecursive sql>), ...] <q>)
-\end{minted}
+\end{cminted}
     \caption{Grammar for tail-recursive queries. This notion could be extended, but catches most cases as it is.}
     \label{tr_grammar}
 \end{figure}
 
 CTEs can be included in the query if they are only referenced from the callsite-arguments. Callsite-arguments are evaluated during callgraph creation. During evaluation the callsites including their arguments are replaced by references to their results. Because of this, CTEs are present but unused during evaluation. Therefore the resulting query is eligible for the tail recursive optimization.
 
+\clearpage
+
 \section{Constant argument removal}
 
 Some functions have arguments always just passed on to subsequent calls without modification, eg. configuration parameters. As these parameters do not change it is not necessary to include them in the callgraph-table or when matching rows by arguments. The argument can just be left as it is in the translation, eg. as \texttt{\$1}.
 
-\begin{wrapfigure}{r}{0.66\textwidth}
-  \vspace{-10pt}
+\begin{figure}[h!]
     \sqlcode{snippets/sieve.sql}
   \caption{Sieve of Eratosthenes. \texttt{sieve(2, ARRAY[1, 2, 3, ..., n])} computes all prime numbers up to \texttt{n}.}
   \label{lst:sieve_udf}
-\end{wrapfigure}
+\end{figure}
 
 Omitting unnecessary arguments saves memory as well as CPU-time. The two tables \texttt{callgraph} and \texttt{evaluation} are joined in each iteration of the \texttt{evaluation}-CTE by the function arguments. Removing unnecessary comparisons speeds up the query and saves memory as the same value is not copied again and again.
 
@@ -188,7 +204,7 @@ No change to the template is necessary and detection of constant arguments is st
 
 \begin{figure}[h]
     \centering
-    \begin{minted}{postgresql}
+    \begin{cminted}{postgresql}
 SELECT c.in_1                                  AS in_1, 
        (SELECT array_agg(T.v)
         FROM unnest($2) AS T(v)
@@ -196,7 +212,7 @@ SELECT c.in_1                                  AS in_1,
           AND T.v = ANY((SELECT e.result)))       AS result
 FROM calls_to_basecases c
 WHERE (SELECT (2 * c.out_1) > (array_length($2, 1))
-    \end{minted}
+    \end{cminted}
     \caption{Evaluation of a nonrecursive scenario of \texttt{sieve} inside the \texttt{basecases}-CTE with constant argument removal. Note that \texttt{\$2} is not replaced by \texttt{c.in\_2}.}
     \label{fig:my_label}
 \end{figure}
@@ -213,11 +229,11 @@ If the return type is not hashable the result from each evaluated scenario must 
 
 Hashable arguments have to be casted to \texttt{TEXT} when creating the \texttt{callgraph}. To evaluate the callsite-arguments the reference to the \texttt{out}-columns must be casted back to the original type. The same is required when replacing arguments during scenario-evaluation.
 
-Unhashable types are detected by introspecting PostgreSQL (\autoref{sql:hashable_query}). This makes the translation aware of custom hash-operators. PostgreSQL has some type-aliases defined, eg. \texttt{smallint} is an alias for \texttt{int2}. The first is returned by \texttt{t.oid :: regtype} and the latter by \textit{t.typename}.
+Unhashable types are detected by introspecting PostgreSQL (\autoref{sql:hashable_query}). This makes the translation aware of custom hash-operators. PostgreSQL has some type-aliases defined, eg. \texttt{smallint} is an alias for \texttt{int2}. The first is returned by \texttt{t.oid::regtype} and the latter by \texttt{t.typename}.
 
 \begin{figure}
     \centering
-\begin{minted}{postgresql}
+\begin{cminted}{postgresql}
 SELECT t.typname :: TEXT 
 FROM pg_operator as o, pg_type as t 
 WHERE o.oprleft = t.oid 
@@ -233,7 +249,7 @@ WHERE o.oprleft = t.oid
   AND o.oprright = t.oid 
   AND o.oprname = '=' 
   AND o.oprcanhash;
-\end{minted}
+\end{cminted}
     \caption{Query to obtain all type-aliases from a PostgreSQL-instance that have an operator defined that can be used for hashing.}
     \label{sql:hashable_query}
 \end{figure}
