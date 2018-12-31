@@ -1,4 +1,4 @@
-\chapter{Evaluation and discussion}\label{results_discussion}
+\chapter{Evaluation and discussion}\label{chapter:evaluation}
 
 This chapter evaluates the performance of the automatically generated translation. I compare runtimes of various versions of the same functions. I compare the original function against its translation. I measure the effect of the presented optimizations and compare the translation against a manually optimized formulation.
 
@@ -27,7 +27,7 @@ The generic template is the default template without any UDF-specific optimizati
     \label{fig:fib_times}
 \end{figure}
 
-Runtimes vary greatly between the three implementations. The original implementation is faster for very small inputs as it has less overhead then the translation. Additionally, the first two (\texttt{fib(\$n-1)} and \texttt{fib(\$n-2)}) calls are inlined which reduces overhead further. However, the runtime of the original function grows very fast, \texttt{fib(30)} already takes minutes.
+Runtimes vary greatly between the three implementations. The original implementation is faster for very small inputs as it has less overhead then the translation. Additionally, the first two (\texttt{fib(\$1-1)} and \texttt{fib(\$1-2)}) calls are inlined which reduces overhead further. However, the runtime of the original function grows very fast, \texttt{fib(30)} already takes minutes.
 
 The translated function is much faster nonetheless. Where the original takes minutes the translation is finished under 10ms. Even for \texttt{fib(1000)} the call returns after about 2 seconds. For very small inputs the runtime seems to be nearly constant, possibly because the tiny computations are marginalized by the constant overhead of the template. After leveling up the runtime of the translation has a slope of approximately 2 indicating quadratically growth.
 
@@ -36,7 +36,7 @@ Though the runtime grows as the inputs get even larger, but in a slower pace. Th
 
 Eventually, other limitations stop computing even larger Fibonacci numbers in PostgreSQL: Somewhere between fib(600000) and fib(700000) the numeric datatype (which can represent numbers up to 131072 digits! \cite[p. 124 f.]{psql}) fails with an overflow. That being said, the manual optimized implementation is "as good as we can get" in SQL.
 
-Each implementation has changed the complexity-class of the implementation. The recursive implementation of \texttt{fib} is exponential \cite{} as previously computed values are repeatedly recomputed. Actually, the calltrees of the callsites are identical except for a single call.
+Each implementation has changed the complexity-class of the implementation. The recursive implementation of \texttt{fib} is exponential as previously computed values are repeatedly recomputed. Actually, the calltrees of the callsites are identical except for a single call.
 
 Problems with overlapping subproblems, as with Fibonacci, are subject to an optimization technique called "Dynamic Programming" and "Memoization". Starting from optimal subproblems solutions of larger problems are incremental computed. Dynamic Programming requires therefore to reformulate the algorithm to implement this approach. Memoization solves the problem top-down keeping the original recursive structure of the function. It is checked for each call whether this call was already evaluated. If so, the saved value is returned. Our translation uses the original recursive formulation and applies automatic memoization avoiding any redundant calls.
 
@@ -206,7 +206,7 @@ The UDF-slices from the scenario analysis could be used to fill templates in ano
 
 The callgraph is a precious source of information about the runtime-behaviour of the recursive function. If we can exploit this information evaluation can happen much more efficiently.
 
-Problematic about the workaround to allow back-references in self-referential CTEs are the always accumulating many redundant rows. These duplicates cannot be removed from the growing result of the CTE during evaluation and need to be eventually traversed in order to select the result of the evaluation.
+Problematic about the workaround allowing back-references in self-referential CTEs is the accumulation of lots of redundant rows. These duplicates cannot be removed from the growing result of the CTE during evaluation and need to be eventually traversed in order to select the result of the evaluation.
 
 Another option is to use the callgraph to read only those rows which are required by later callsites. In each iteration of the evaluation, one topological level of the callgraph is evaluated. It is easy to check after each iteration which nodes in the callgraph have no more dependencies to callsites which are not already evaluated. Those values can be safely removed from the result set as these results will not be needed again.
 

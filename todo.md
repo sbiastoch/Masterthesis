@@ -1,7 +1,9 @@
 - fix final optimizations section!!!
 - Layout
 - OS:judgements?
-- 
+- fix fib plot
+- check for question marks
+- check citations
 
 appendix:
 - whole Translations:
@@ -9,13 +11,6 @@ appendix:
   - SR
   - TR
   - CAR
- Analysis results for:
-  - X Expr
-  - X SELECT
-  - X FROM
-  - X WHERE
-  - X CTEs
-- functions used in evaluation
 
 nice to have:
 - stepwise callgraph creation grafik

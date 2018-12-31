@@ -51,6 +51,8 @@
     linkcolor=black,
     urlcolor=black
 }
+\usepackage{moresize}
+
 \usepackage{listings}
 \lstset{
     mathescape=true,
@@ -122,7 +124,12 @@
     \end{tikzpicture}}}
 
 % Do not make minted full width but only so wide as required
-\RecustomVerbatimEnvironment{Verbatim}{BVerbatim}{}
+%\RecustomVerbatimEnvironment{Verbatim}{BVerbatim}{}
+\usepackage{xpatch,letltxmacro}
+\LetLtxMacro{\cminted}{\minted}
+\let\endcminted\endminted
+\xpretocmd{\cminted}{\RecustomVerbatimEnvironment{Verbatim}{BVerbatim}{}}{}{}
+
 
 \DeclareMathOperator{\FV}{\text{\rm FV}} % set of free variables
 \DeclareMathOperator{\deps}{\ensuremath{\text{deps}}}

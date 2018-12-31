@@ -685,7 +685,7 @@ $
 
 \section{Handling CTEs}
 
-Common Table Expressions (CTEs) are a powerful tool to structure and tweak complex queries. They work like temporary tables which only exist for an individual query. However, while allowing CTEs containing callsites introduces some complexities needing to be considered when analyzing, allowing CTEs not containing callsites is - for now - simply impossible.
+Common Table Expressions (CTEs) are a powerful tool to structure and tweak complex queries. They work like temporary tables which only exist for an individual query. However, allowing CTEs containing callsites introduce some complexities that need to be considered when analyzing.
 
 % Without CTEs hasCallsite just checks the subtree
 With S-F-W queries the notion of \textit{containing a callsite} (or being \textit{recursive}) is simple. If a query-fragment $e$ contains a callsite, the subexpression is recursive: $\hasCallsite(e) = fn \sqsubset e$. From an implementation point of view it is as simple as filtering the AST of $e$ for callsites.

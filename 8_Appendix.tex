@@ -4,49 +4,27 @@
 %\addcontentsline{toc}{chapter}{Anhang} 
 
 \chapter[Appendix]{Appendix}
+Automatic generated outputs in the following have been slightly beautified for readability and compactness.
 \phantomsection
 
-\section{Usage of \texttt{twr}}
-\begin{figure}[h!]
-    \centering
-    \input{snippets/cli.tex}
-    \caption{Usage of the Haskell implementation \texttt{twr}}
-\end{figure}
+\section{Exemplary analysis results}
 
-\section{Exemplary analysis results utilizing different rules}
-\subsection{\REXPR-rule}
+\subsection{Exemplary UDFs}
+
 \begin{figure}[h!]
     \centering
     \input{snippets/case_plus_case_udf.tex}
-    \caption{UDF \texttt{case\_plus\_case}, used to showcase application of the \REXPR-rule.}
+    \caption{UDF \texttt{case\_plus\_case} used to demonstrate application of the \REXPR-rule.}
     \label{udf:case_plus_case}
 \end{figure}
 
 \begin{figure}[h!]
     \centering
-    \input{snippets/case_plus_case_analysis_results.tex}
-    \caption{Analysis output of \autoref{udf:case_plus_case}, for demonstration of the \REXPR-rule (slightly beautified).}
-    \label{scenarios:case_plus_case}
-\end{figure}
-\FloatBarrier
-
-\subsection{\RSELECT-rule}
-\begin{figure}[h!]
-    \centering
     \input{snippets/fib_cols_udf.tex}
-    \caption{UDF \texttt{fib\_cols}, used to showcase application of the \RSELECT-rule.}
+    \caption{UDF \texttt{fib\_cols} used to showcase the \RSELECT-rule.}
     \label{udf:fib_cols}
 \end{figure}
 
-\begin{figure}[h!]
-    \centering
-    \input{snippets/fib_cols_analysis_results.tex}
-    \caption{Analysis output of \autoref{udf:fib_cols}, for demonstration of the \RSELECT-rule (slightly beautified).}
-    \label{scenarios:fib_cols}
-\end{figure}
-\FloatBarrier
-
-\subsection{\RFROM-rule}
 \begin{figure}[h!]
     \centering
     \input{snippets/fib_from_udf.tex}
@@ -56,15 +34,6 @@
 
 \begin{figure}[h!]
     \centering
-    \input{snippets/fib_from_analysis_result.tex}
-    \caption{Analysis output of \autoref{udf:fib_from}, for demonstration of the \RFROM-rule (slightly beautified).}
-    \label{scenarios:fib_from}
-\end{figure}
-
-\FloatBarrier
-\subsection{\RWHERE-rule}
-\begin{figure}[h!]
-    \centering
     \input{snippets/sieve_udf.tex}
     \caption{UDF \texttt{sieve} implementing the Sieve of Eratosthenes, used to showcase application of the \RWHERE-rule.}
     \label{udf:sieve}
@@ -72,39 +41,129 @@
 
 \begin{figure}[h!]
     \centering
-    \input{snippets/sieve_analysis_output.tex}
-    \caption{Analysis output of \autoref{udf:sieve}, for demonstration of the \RFROM-rule (slightly beautified).}
-    \label{scenarios:sieve}
-\end{figure}
-\FloatBarrier
-
-\subsection{\RCTE-rule}
-\begin{figure}[h!]
-    \centering
-    \input{snippets/fib_cte_analysis_results.tex}
-    \caption{UDF \texttt{case\_plus\_case}, used to showcase application of the \REXPR-rule.}
+    \input{snippets/fib_cte_udf.tex}
+    \caption{UDF \texttt{fib\_cte} for demonstration of the \RCTE- and \RWITH-rule.}
     \label{udf:fib_cte}
 \end{figure}
 
 \begin{figure}[h!]
     \centering
+    \sqlcode{snippets/quicksort_udf.sql}
+    \caption{UDF \texttt{quicksort} used as example for an divide-and-conquer algorithm in \autoref{chapter:evaluation}.}
+    \label{udf:fib_cte}
+\end{figure}
+
+\FloatBarrier
+\subsection{\REXPR-rule}
+
+\begin{figure}[h!]
+    \centering
+    \input{snippets/case_plus_case_analysis_results.tex}
+    \caption{Analysis output of \texttt{case\_plus\_case} (\autoref{udf:case_plus_case}) demonstration the \REXPR-rule.}
+    \label{scenarios:case_plus_case}
+\end{figure}
+
+\FloatBarrier
+
+\subsection{\RSELECT-rule}
+
+\begin{figure}[h!]
+    \centering
+    \input{snippets/fib_cols_analysis_results.tex}
+    \caption{Analysis output of \texttt{fib\_cols} (\autoref{udf:fib_cols}) demonstration the \RSELECT-rule.}
+    \label{scenarios:fib_cols}
+\end{figure}
+\FloatBarrier
+
+\subsection{\RFROM-rule}
+
+\begin{figure}[h!]
+    \centering
+    \input{snippets/fib_from_analysis_result.tex}
+    \caption{Analysis output of \texttt{fib\_from} (\autoref{udf:fib_from}) demonstration the \RFROM-rule.}
+    \label{scenarios:fib_from}
+\end{figure}
+
+\FloatBarrier
+\subsection{\RWHERE-rule}
+
+\begin{figure}[h!]
+    \centering
+    \input{snippets/sieve_analysis_output.tex}
+    \caption{Analysis output of \texttt{sieve} (\autoref{udf:sieve}) demonstration the \RFROM-rule.}
+    \label{scenarios:sieve}
+\end{figure}
+\FloatBarrier
+
+\subsection{\RCTE- and \RWITH-rule}
+
+\begin{figure}[h!]
+    \centering
     \input{snippets/fib_cte_analysis_results.tex}
-    \caption{Analysis output of \autoref{udf:case_plus_case}, for demonstration of the \RCTE- and \RWITH-rule (slightly beautified).}
+    \caption{Analysis output of \texttt{fib\_cte} (\autoref{udf:fib_cte}) demonstration the \RCTE- and \RWITH-rule}
     \label{scenarios:fib_cte}
 \end{figure}
 \FloatBarrier
 
+
+
+
 \section{Example translations}
 
 \subsection{\texttt{fib}}
+
 \begin{figure}[h!]
-    \centering\footnotesize
-    \sqlcode{snippets/fib_callstack.sql}
-    \caption{\texttt{callstack}-CTE as standalone query. Note that the UDF argument \texttt{\$1} is replaced with a SQL-variable \texttt{:n}}
-    \label{fib:callstack_cte_complete}
+    \centering
+    \input{snippets/fib_analysis_output.tex}
+    \caption{Verbose output when translating the Fibonacci function from file \texttt{q/fib.sql} and persisting to database.}
 \end{figure}
 
-\section{Conditional normalization}
+\newgeometry{bottom=8mm}
+\sqlcode[fontsize=\ssmall]{snippets/fib_translated.sql}
+\captionof{figure}{Translation of \texttt{fib}\label{translation:fib}}
+\restoregeometry
+
+
+\subsection{\texttt{param4}}
+
+\begin{figure}[h!]
+    \centering
+    \include{snippets/param4_udf.tex}
+    \caption{Simple tail recursive function \texttt{param4} with 3 constant arguments.}
+    \label{udf:param4}
+\end{figure}
+
+\newgeometry{bottom=8mm}
+\newpage
+\sqlcode[fontsize=\ssmall]{snippets/param4_translated.sql}
+\captionof{figure}{Generic translation of \texttt{param4} without any optimizations.\label{translation:param4}}
+
+\newpage
+\sqlcode[fontsize=\ssmall]{snippets/param4_translated_sr.sql}
+\captionof{figure}{Single recursive translation of \texttt{param4}.\label{translation:param4_sr}}
+
+\newpage
+\sqlcode[fontsize=\ssmall]{snippets/param4_translated_sr_cp.sql}
+\captionof{figure}{Single recursive translation of \texttt{param4} with constant argument removal.\label{translation:param4_sr_cp}}
+
+\newpage
+\sqlcode[fontsize=\footnotesize]{snippets/param4_translated_tr_cp.sql}
+\captionof{figure}{Tail recursive translation of \texttt{param4} with constant argument removal, ie. fully optimized.\label{translation:param4_tr_cp}}
+\restoregeometry
+
+\section{Other UDFs and Snippets}
+
+\subsection{Manually optimized version of \texttt{fib}}
+
+\begin{figure}[h!]
+    \centering
+    \include{snippets/fib_manually_optimized.tex}
+    \caption{Manually optimized version of \texttt{fib}}
+    \label{udf:fib_man}
+\end{figure}
+
+\subsection{Conditional normalization}
+
 \begin{figure}[h!]
     \centering
 \sqlcode{appendix/conditional_normalization.sql}\label{sql:conditionals}
@@ -112,16 +171,9 @@
     \label{conditional_normalization}
 \end{figure}
 
+\subsection{Usage of \texttt{twr}}
 \begin{figure}[h!]
     \centering
-    \sqlcode{appendix/paramN.sql}
-    \caption{UDFs with varying number of arguments used for \autoref{fig:paramN}}
-    \label{udfs:paramN}
+    \input{snippets/cli.tex}
+    \caption{Usage of the Haskell implementation \texttt{twr}}
 \end{figure}
-
-\begin{figure}[h!]
-    \centering
-    \input{snippets/fib_analysis_output.tex}
-    \caption{Verbose output when translating the Fibonacci function from file \texttt{q/fib.sql} and persisting to database.}
-\end{figure}
-%%%%%%%%%%%%%%%%%%%%%%%%

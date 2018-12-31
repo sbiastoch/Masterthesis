@@ -1,4 +1,4 @@
-\chapter{Optimizations}
+\chapter{Optimizations}\label{chapter:optimizations}
 
 If certain characteristics of the UDF are detected optimized translation templates which exploit those characteristics can be chosen. This may either improve performance or enables us to implement work-arounds for settings where the original templates are not applicable otherwise.
 
@@ -69,7 +69,7 @@ WITH RECRUSIVE
     evaluation(in_1, res) AS (
         (TABLE basecases)
         
-        UNION ( -- was UNION ALL
+        UNION ALL (
             WITH e AS (TABLE evaluation)
             (<eval_recursive_scenario_sr(scenario[1])>)
                UNION ALL

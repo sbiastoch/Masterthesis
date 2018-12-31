@@ -88,7 +88,7 @@ Recursive functions can be created in PostgreSQL as UDFs. UDFs can be implemente
 
 \begin{figure}[h!]
     \centering
-    \begin{minted}{postgresql}
+    \begin{cminted}{postgresql}
 CREATE FUNCTION fac(INT) RETURNS INT AS $$
 SELECT CASE WHEN $1 = 1 THEN 1
             ELSE $1 * fac($1 - 1)
@@ -96,9 +96,9 @@ SELECT CASE WHEN $1 = 1 THEN 1
 $$ LANGUAGE SQL;
 
 SELECT fac(10);
-    \end{minted}
-    \caption{Calculation of $10!$ using a recursive UDF \texttt{fac)}.}
-    \label{fig:my_label}
+    \end{cminted}
+    \caption{Calculation of $10!$ using a recursive UDF \texttt{fac}.}
+    \label{udf:fac}
 \end{figure}
 
 UDFs are mostly a black box for the query planner. They have just a fixed cost assigned as a whole (default 1000 \cite[p. 1435]{psql}) and the body of every call is planned before execution.

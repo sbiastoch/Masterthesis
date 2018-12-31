@@ -1,0 +1,16 @@
+\begin{minted}{postgresql}
+-- based on https://wiki.postgresql.org/wiki/Fibonacci_Numbers
+CREATE FUNCTION fib_man(n NUMERIC) 
+RETURNS NUMERIC LANGUAGE SQL AS $$
+WITH RECURSIVE t(i, a, b) AS (
+        SELECT 0, 0 :: NUMERIC, 1 :: NUMERIC
+    UNION ALL
+        SELECT i + 1         AS i, 
+               GREATEST(a,b) AS a,
+        	   a + b         AS b 
+        FROM t
+        WHERE i < n
+)
+SELECT MAX(a) FROM t;
+$$ LANGUAGE SQL;
+\end{minted}

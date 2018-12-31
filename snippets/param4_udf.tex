@@ -1,0 +1,8 @@
+\begin{minted}{postgresql}
+CREATE FUNCTION param4_tr(NUMERIC, NUMERIC, NUMERIC, NUMERIC)
+RETURNS NUMERIC AS $$
+SELECT CASE WHEN $1 < 0 THEN $2 + $3 + $4
+            ELSE param4_tr($1 - 1, $2, $3, $4)
+       END
+$$ LANGUAGE SQL;
+\end{minted}
