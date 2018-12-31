@@ -1,15 +1,20 @@
 \cleardoublepage
 \renewcommand{\thesection}{\Alph{section}}%
 %\appendix 
-%\addcontentsline{toc}{chapter}{Anhang} 
+%\addcontentsline{toc}{chapter}{Anhang}
 
 \chapter[Appendix]{Appendix}
-Automatic generated outputs in the following have been slightly beautified for readability and compactness.
+Automatic generated outputs have been slightly beautified for readability and compactness.
 \phantomsection
 
-\section{Exemplary analysis results}
+\section{Exemplary UDFs}
 
-\subsection{Exemplary UDFs}
+\begin{figure}[h!]
+    \centering
+    \input{snippets/fib_udf.tex}
+    \caption{UDF \texttt{fib} as used in \autoref{chapter:evaluation}.}
+    \label{udf:fib}
+\end{figure}
 
 \begin{figure}[h!]
     \centering
@@ -53,8 +58,17 @@ Automatic generated outputs in the following have been slightly beautified for r
     \label{udf:fib_cte}
 \end{figure}
 
+\begin{figure}[h!]
+    \centering
+    \input{snippets/param4_udf}
+    \caption{Simple tail recursive function \texttt{param4} with 3 constant arguments used in \autoref{chapter:evaluation}.}
+    \label{udf:param4}
+\end{figure}
+
 \FloatBarrier
-\subsection{\REXPR-rule}
+\newgeometry{bottom=8mm}
+\section{Exemplary analysis results}
+\subsection{{\normalfont\REXPR}-rule}
 
 \begin{figure}[h!]
     \centering
@@ -64,8 +78,8 @@ Automatic generated outputs in the following have been slightly beautified for r
 \end{figure}
 
 \FloatBarrier
-
-\subsection{\RSELECT-rule}
+\newpage
+\subsection{{\normalfont\RSELECT}-rule}
 
 \begin{figure}[h!]
     \centering
@@ -73,9 +87,11 @@ Automatic generated outputs in the following have been slightly beautified for r
     \caption{Analysis output of \texttt{fib\_cols} (\autoref{udf:fib_cols}) demonstration the \RSELECT-rule.}
     \label{scenarios:fib_cols}
 \end{figure}
-\FloatBarrier
+\restoregeometry
 
-\subsection{\RFROM-rule}
+\FloatBarrier
+\newpage
+\subsection{{\normalfont\RFROM}-rule}
 
 \begin{figure}[h!]
     \centering
@@ -83,9 +99,9 @@ Automatic generated outputs in the following have been slightly beautified for r
     \caption{Analysis output of \texttt{fib\_from} (\autoref{udf:fib_from}) demonstration the \RFROM-rule.}
     \label{scenarios:fib_from}
 \end{figure}
-
 \FloatBarrier
-\subsection{\RWHERE-rule}
+\newpage
+\subsection{{\normalfont\RWHERE}-rule}
 
 \begin{figure}[h!]
     \centering
@@ -94,8 +110,9 @@ Automatic generated outputs in the following have been slightly beautified for r
     \label{scenarios:sieve}
 \end{figure}
 \FloatBarrier
-
-\subsection{\RCTE- and \RWITH-rule}
+\newpage
+\newgeometry{bottom=8mm}
+\subsection{{\normalfont\RCTE}- and {\normalfont\RWITH}-rule}
 
 \begin{figure}[h!]
     \centering
@@ -104,72 +121,69 @@ Automatic generated outputs in the following have been slightly beautified for r
     \label{scenarios:fib_cte}
 \end{figure}
 \FloatBarrier
+\restoregeometry
 
 
 
 
-\section{Example translations}
-
+\newgeometry{bottom=8mm}
+\section{Exemplary translations}
 \subsection{\texttt{fib}}
-
-\begin{figure}[h!]
-    \centering
-    \input{snippets/fib_analysis_output.tex}
-    \caption{Verbose output when translating the Fibonacci function from file \texttt{q/fib.sql} and persisting to database.}
-\end{figure}
-
-\newgeometry{bottom=8mm}
-\sqlcode[fontsize=\ssmall]{snippets/fib_translated.sql}
-\captionof{figure}{Translation of \texttt{fib}\label{translation:fib}}
+\sqlcode[fontsize=\footnotesize]{snippets/fib_translated.sql}
+\captionof{figure}{Translation of \texttt{fib} (\autoref{udf:fib})\label{translation:fib}}
 \restoregeometry
-
-
-\subsection{\texttt{param4}}
-
-\begin{figure}[h!]
-    \centering
-    \include{snippets/param4_udf.tex}
-    \caption{Simple tail recursive function \texttt{param4} with 3 constant arguments.}
-    \label{udf:param4}
-\end{figure}
+\clearpage
+\FloatBarrier
+\newpage
 
 \newgeometry{bottom=8mm}
+\subsection{\texttt{param4} (generic)}
+\sqlcode[fontsize=\scriptsize]{snippets/param4_translated.sql}
+\captionof{figure}{Generic translation of \texttt{param4} (\autoref{udf:param4}) without any optimizations.\label{translation:param4}}
+\clearpage
 \newpage
-\sqlcode[fontsize=\ssmall]{snippets/param4_translated.sql}
-\captionof{figure}{Generic translation of \texttt{param4} without any optimizations.\label{translation:param4}}
 
+\subsection{\texttt{param4} (single recursive)}
+\sqlcode[fontsize=\footnotesize]{snippets/param4_translated_sr.sql}
+\captionof{figure}{Single recursive translation of \texttt{param4} (\autoref{udf:param4}).\label{translation:param4_sr}}
+\clearpage
 \newpage
-\sqlcode[fontsize=\ssmall]{snippets/param4_translated_sr.sql}
-\captionof{figure}{Single recursive translation of \texttt{param4}.\label{translation:param4_sr}}
 
+\subsection{\texttt{param4} (single recursion + const. arg. removal)}
+\sqlcode[fontsize=\scriptsize]{snippets/param4_translated_sr_cp.sql}
+\captionof{figure}{Single recursive translation of \texttt{param4}  (\autoref{udf:param4}) with constant argument removal.\label{translation:param4_sr_cp}}
+\clearpage
 \newpage
-\sqlcode[fontsize=\ssmall]{snippets/param4_translated_sr_cp.sql}
-\captionof{figure}{Single recursive translation of \texttt{param4} with constant argument removal.\label{translation:param4_sr_cp}}
 
-\newpage
+\subsection{\texttt{param4} (tail recursion + const. arg. removal)}
 \sqlcode[fontsize=\footnotesize]{snippets/param4_translated_tr_cp.sql}
-\captionof{figure}{Tail recursive translation of \texttt{param4} with constant argument removal, ie. fully optimized.\label{translation:param4_tr_cp}}
+\captionof{figure}{Tail recursive translation of \texttt{param4} (\autoref{udf:param4}) with constant argument removal, ie. fully optimized.\label{translation:param4_tr_cp}}
 \restoregeometry
+\FloatBarrier
 
-\section{Other UDFs and Snippets}
+
+\section{Miscellaneous}
 
 \subsection{Manually optimized version of \texttt{fib}}
-
 \begin{figure}[h!]
     \centering
-    \include{snippets/fib_manually_optimized.tex}
-    \caption{Manually optimized version of \texttt{fib}}
+    \input{snippets/fib_manually_optimized.tex}
+    \caption{Manually optimized version of \texttt{fib} (\autoref{udf:fib})}
     \label{udf:fib_man}
 \end{figure}
+\clearpage
+\FloatBarrier
+\newpage
 
 \subsection{Conditional normalization}
-
 \begin{figure}[h!]
     \centering
-\sqlcode{appendix/conditional_normalization.sql}\label{sql:conditionals}
+    \sqlcode{appendix/conditional_normalization.sql}
     \caption{SQL-conditionals implemented by \texttt{CASE}-expressions.}
     \label{conditional_normalization}
 \end{figure}
+\clearpage
+\FloatBarrier
 
 \subsection{Usage of \texttt{twr}}
 \begin{figure}[h!]

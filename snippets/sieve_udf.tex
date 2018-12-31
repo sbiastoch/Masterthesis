@@ -7,6 +7,5 @@ WHERE CASE WHEN 2 * i > array_length(xs, 1) THEN TRUE
                  OR T.v % i != 0 -- remove all multiples of i
                 ) AND T.v = ANY(sieve(i + 1, xs)) -- keep only other nonprime numbers
           END;
-$$
-LANGUAGE SQL;
+$$ LANGUAGE SQL;
 \end{minted}

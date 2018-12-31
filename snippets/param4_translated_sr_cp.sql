@@ -62,7 +62,7 @@ WITH RECURSIVE
         FROM callgraph c INNER JOIN e ON (e.in_1) = (c.out_1)
         WHERE c.call_site = 1)
     )
-SELECT COALESCE(   (SELECT DISTINCT ON (e.res) e.res 
+SELECT COALESCE(   (SELECT DISTINCT e.res 
                     FROM evaluation AS e(in_1, res)
                     WHERE (e.in_1) = ($1))
                 ,  (SELECT DISTINCT NULL :: numeric FROM loop))

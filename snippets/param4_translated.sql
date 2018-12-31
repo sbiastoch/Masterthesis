@@ -70,6 +70,9 @@ WITH RECURSIVE
                               WHERE (c2.in_1, c2.in_2, c2.in_3, c2.in_4) 
                                     = (c.out_1, c.out_2, c.out_3, c.out_4))
         )
+        
+        
+        
         SELECT c.out_1                                         AS in_1, 
                c.out_2                                         AS in_2, 
                c.out_3                                         AS in_3, 
@@ -107,10 +110,12 @@ WITH RECURSIVE
                            c.in_4                     AS in_4, 
                            nth_value(e.res, 1) OVER w AS res_call_1, 
                            count(*) OVER w            AS res_count
-                    FROM callgraph c INNER JOIN e ON (e.in_1, e.in_2, e.in_3, e.in_4) = (c.out_1, c.out_2, c.out_3, c.out_4)
+                    FROM callgraph c INNER JOIN e ON (e.in_1, e.in_2, e.in_3, e.in_4) 
+                                                        = (c.out_1, c.out_2, c.out_3, c.out_4)
                     WHERE NOT EXISTS (SELECT NULL 
                                       FROM e
-                                      WHERE (e.in_1, e.in_2, e.in_3, e.in_4) = (c.in_1, c.in_2, c.in_3, c.in_4))
+                                      WHERE (e.in_1, e.in_2, e.in_3, e.in_4) 
+                                               = (c.in_1, c.in_2, c.in_3, c.in_4))
                            AND c.call_site = ANY(ARRAY[1])
                     WINDOW w AS (PARTITION BY (c.in_1, c.in_2, c.in_3, c.in_4) 
                                  ORDER BY (c.call_site) ASC RANGE UNBOUNDED PRECEDING)
@@ -133,7 +138,7 @@ WITH RECURSIVE
             )
         )
     )
-SELECT COALESCE(   (SELECT DISTINCT ON (e.res) e.res 
+SELECT COALESCE(   (SELECT DISTINCT e.res 
                     FROM evaluation AS e(in_1, in_2, in_3, in_4, res)
                     WHERE (e.in_1, e.in_2, e.in_3, e.in_4) = ($1, $2, $3, $4))
                 ,  (SELECT DISTINCT NULL :: numeric FROM loop))

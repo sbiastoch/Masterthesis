@@ -7,7 +7,7 @@ WITH RECURSIVE t(i, a, b) AS (
     UNION ALL
         SELECT i + 1         AS i, 
                GREATEST(a,b) AS a,
-        	   a + b         AS b 
+               a + b         AS b 
         FROM t
         WHERE i < n
 )

@@ -1,0 +1,7 @@
+\begin{minted}{postgresql}
+CREATE FUNCTION fib(numeric) RETURNS numeric AS $$
+SELECT CASE WHEN $1 <= 2 THEN 1
+            ELSE fib($1 - 1) + fib($1 - 2)
+       END;
+$$ LANGUAGE SQL;
+\end{minted}

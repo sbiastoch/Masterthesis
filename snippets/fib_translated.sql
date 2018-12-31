@@ -55,6 +55,7 @@ WITH RECURSIVE
                               FROM callgraph AS c2 
                               WHERE (c2.in_1) = (c.out_1))
         )
+        
         SELECT c.out_1               AS in_1, 
                (SELECT 1 :: numeric) AS res 
         FROM c
@@ -71,8 +72,9 @@ WITH RECURSIVE
                 FROM evaluation
             ), 
             new_results(in_1, res) AS (
-                SELECT arg_res.in_1                                              AS in_1, 
-                       (SELECT arg_res.res_call_1) + (SELECT arg_res.res_call_2) AS res
+                SELECT arg_res.in_1                    AS in_1, 
+                       (SELECT arg_res.res_call_1)
+                         + (SELECT arg_res.res_call_2) AS res
                 FROM (
                     SELECT c.in_1                     AS in_1, 
                            nth_value(e.res, 1) OVER w AS res_call_1, 
@@ -98,8 +100,6 @@ WITH RECURSIVE
             )
         )
     )
-SELECT COALESCE(   (SELECT DISTINCT ON (e.res) e.res 
-                    FROM evaluation AS e(in_1, res)
-                    WHERE (e.in_1) = ($1))
-                ,  (SELECT DISTINCT NULL :: numeric FROM loop))
+SELECT COALESCE((SELECT DISTINCT e.res FROM evaluation AS e WHERE (e.in_1) = ($1)),
+                (SELECT DISTINCT NULL :: numeric FROM loop))
 $$ LANGUAGE SQL;

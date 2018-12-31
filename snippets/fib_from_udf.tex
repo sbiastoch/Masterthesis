@@ -1,6 +1,5 @@
 \begin{minted}{postgresql}
-CREATE FUNCTION fib_from(n NUMERIC)
-RETURNS NUMERIC AS $$
+CREATE FUNCTION fib_from(n NUMERIC) RETURNS NUMERIC AS $$
 SELECT
   CASE
     WHEN n <= 2 THEN 1
