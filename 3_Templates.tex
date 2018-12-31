@@ -271,25 +271,24 @@ The solution is to avoid array aggregation and to transpose the groups instead: 
 
 With this problem solved, evaluating a recursive scenario boiles down to replacing UDF-arguments and callsites with \texttt{callgraph}- resp. \texttt{evaluation}-references, similar to the evaluation of nonrecursive scenarios (\autoref{macro:single_basecase}). \autoref{macro:recursive_scenario_evaluation} gives a macro to evaluate a scenario utilizing the transposing-approach mentioned above.
 
-\begin{figure}[h!]\small
+\begin{figure}[h!]\footnotesize
     \centering
-    \begin{minipage}[b]{\linewidth}
-    \centering
-    \sqlcode{snippets/eval_recursive_scenario.sql}
-    \vspace{3mm}
-    \subcaption{(b) shows the result of the join, (c) the final result of the generated query and the effects of the ~\WHERE-clauses are annnotated: \circled{1} Do not consider arguments already evaluated callsites. \circled{2} Only consider callsites of the given scenario we are about to evaluate. \circled{3} Only keep rows where all callsites have an result available.}\label{}
-    \end{minipage}%
-    \caption{Collecting callsite results of for evaluation of a scenario. The result for \texttt{fib(3)} is beeing evaluated. Table (a) shows the result of the }\label{macro:recursive_scenario_evaluation}
+    \sqlcode[fontsize=\scriptsize]{snippets/eval_recursive_scenario.sql}
+    \caption{Collecting callsite results of for evaluation of a scenario. The result for \texttt{fib(3)} is beeing evaluated. \autoref{eval_rec_join_result} shows the result of the join (b), the final result of the generated query (c) is depicted in \autoref{eval_rec_join_final}.\\
+    The effects of the ~\WHERE-clauses (1), (2) and (3) are shown in \autoref{eval_rec_join_final}: (1) Do not consider arguments already evaluated callsites. (2) Only consider callsites of the given scenario we are about to evaluate. (3) Only keep rows where all callsites have an result available.}
+    \label{macro:recursive_scenario_evaluation}
 \end{figure}
+
+
 \begin{figure}[h!]
-    \ContinuedFloat
     \small
     \centering
+
     \begin{minipage}[b]{\linewidth}
-    \centering
-    \begin{tabular}{c|c|p{10cm}p{1em}p{1cm}|c}
-      \multicolumn{3}{l}{$\overbrace{\rule{5.2cm}{0pt}}^{\texttt{callgraph}}$}  & ${}^{\bowtie}$ & \multicolumn{2}{l}{$\overbrace{\rule{2.8cm}{0pt}}^{\texttt{evaluation}}$} \\
-      \texttt{c.in\_1}                        & \texttt{c.call\_site\_id}  & \multicolumn{3}{c|}{\texttt{c.out\_1 = e.in\_1}} & \texttt{e.res}                                         \\\hline
+    \centering\footnotesize
+    \begin{tabular}{|c|c|p{10cm}p{1em}p{1cm}|c|}
+      \multicolumn{3}{l}{$\overbrace{\rule{5.8cm}{0pt}}^{\texttt{callgraph}}$}  & \multicolumn{3}{r}{$\overbrace{\rule{2.5cm}{0pt}}^{\texttt{evaluation}}$} \\\hline
+      \colhd{c.in\_1}                        & \colhd{c.call\_site\_id}  & \mcolhd{3}{c.out\_1 = e.in\_1} & \colhd{e.res}                                         \\\hline
       \multirow{2}{*}{\color{gray}4}          & \color{gray}2              & \multicolumn{3}{c|}{\color{gray}3}               & \texttt{\color{gray}NULL} \\
                                               & \color{gray}3              & \multicolumn{3}{c|}{\color{gray}2}               & \color{gray}1             \\\hline
       \cellcolor{green!25}                    & \cellcolor{yellow!30}2     & \multicolumn{3}{c|}{2}                           & \cellcolor{blue!20}1             \\
@@ -298,13 +297,14 @@ With this problem solved, evaluating a recursive scenario boiles down to replaci
                                               & \color{gray}3              & \multicolumn{3}{c|}{\color{gray}0}               & \color{gray}0             \\\hline
       \color{gray}1                           & \color{gray}1              & \multicolumn{3}{c|}{\color{gray}0}               & \color{gray}0             \\\hline
     \end{tabular}
-    \subcaption{Callgraph table joined with evaluation table.}\label{}
+    
+    \subcaption{Callgraph table joined with evaluation table.}\label{eval_rec_join_result}
     \end{minipage}%
     \vspace{7mm}
     \begin{minipage}[b]{\linewidth}
-    \centering
-    \begin{tabular}{rc|c|c|c}
-          & \texttt{in\_1} & \texttt{call\_1} \footnotesize{\color{gray}(id: \colorbox{yellow!20}{2})}  & \texttt{call\_2} \footnotesize{\color{gray}(id: \colorbox{yellow!20}{3})} & \texttt{count} \\\cline{2-5}
+    \centering\footnotesize
+    \begin{tabular}{r|c|c|c|c|}\cline{2-5}
+          & \colhd{in\_1} & \colhd{call\_1 \scriptsize{(id: \colorbox{yellow!20}{\color{gray}2})}}  & \colhd{call\_2 \scriptsize{(id: \colorbox{yellow!20}{\color{gray}3})}} & \colhd{count} \\\cline{2-5}
          \circled{3}                          & \color{gray}\markForTikz{row1Start}{4} & \color{gray}\texttt{NULL}                  & \color{gray}1                     & \color{gray}\markForTikz{row1End}{1} \\\cline{2-5}
          & \cellcolor{green!25}3              & \cellcolor{blue!20}1 & \cellcolor{red!20}1 & 2                                                            \\\cline{2-5}
          \circled{1}                          & \color{gray}\markForTikz{row2Start}{2} & \color{gray}1                              & \color{gray}0                     & \color{gray}\markForTikz{row2End}{2} \\\cline{2-5}
@@ -313,23 +313,22 @@ With this problem solved, evaluating a recursive scenario boiles down to replaci
     \DrawHLine[thick, opacity=0.5]{row1Start}{row1End}
     \DrawHLine[thick, opacity=0.5]{row2Start}{row2End}
     \DrawHLine[thick, opacity=0.5]{row3Start}{row3End}
-    \subcaption{Result of the query. Rows filtered by \WHERE~ are striked through,}\label{}
+    \subcaption{Result of the query. Rows filtered by \WHERE~ are striked through, annotated numbers mark parts of the \WHERE-clause from \autoref{macro:recursive_scenario_evaluation}}\label{eval_rec_join_final}
     \end{minipage}%
-    \caption{(continued)}
+    \caption{}
 \end{figure}
+\FloatBarrier
+\subsection{Evaluating the entire callgraph}
 
-The working-table in recursive CTEs contains only the rows from the previous iteration which is a problem when evaluating. Take the evaluation of \texttt{fib} for example (see \autoref{fig:fib_callstack_graph}): Each recursive scenario depends on the results of the last (\texttt{fib(n-1)}) and the penultimate iteration (\texttt{fib(n-2)}). Standard recursive CTE-semantics allows only access to \texttt{fib(n-1)}.
+Templates to evaluate both nonrecursive and recursive scenarios have been shown, but one impediment have not been considered yet: The working-table in recursive CTEs contains only the rows from the previous iteration. This is hinders the evaluation severely. Take the evaluation of \texttt{fib} for example (see \autoref{fig:fib_callstack_graph}): Each recursive scenario depends on the results of the last (\texttt{fib(n-1)}) and the penultimate iteration (\texttt{fib(n-2)}). SQL allows only access to \texttt{fib(n-1)}. To apply our approach in general it is mandatory having access to all previous results.
 
-To work around this restriction, the working table is added to the actual result-rows in each iteration. If we choose this approach the working-table will never be empty, consequently evaluation would never end. Therefore we need to manually take care of returning the empty table when evaluation should stop. To achieve this, new rows are computed separately in a CTE and used as a guard to prevent addition of the previous results if the CTE contains no rows. \autoref{macro:evaluation_cte} showing the final \texttt{evaluation}-CTE implementing this approach.
+To work around this restriction, the working table is added to the actual result-rows in each iteration. If we choose this approach the working-table will never be empty, consequently evaluation would never end. Therefore we need to manually take care of returning the empty table when evaluation should stop. To achieve this, new rows are computed separately in a CTE and used as a guard to prevent addition of the previous results if the CTE contains no rows. \autoref{macro:evaluation_cte} shows the final \texttt{evaluation}-CTE implementing this approach.
 
 \begin{figure}[h!]\centering
   \sqlcode{snippets/evaluation_cte.sql}
   \caption{High-level structure of the evaluation-CTE}\label{macro:evaluation_cte}
 \end{figure}
 
-
-
-\FloatBarrier
 \subsection{Result collection and termination}
 
 The previous section introduced the components required to start and continue evaluation of recursive scenarios. The final task is to select the result or to trigger an infinite loop if a setting is detected where the original UDF does not terminate, but the translation has.

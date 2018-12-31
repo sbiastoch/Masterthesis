@@ -2,7 +2,7 @@
 
 If certain characteristics of the UDF are detected optimized translation templates which exploit those characteristics can be chosen. This may either improve performance or enables us to implement work-arounds for settings where the original templates are not applicable otherwise.
 
-To make these optimizations no change in the scenario analysis is required. Instead the scenarios of the UDF are tested for the properties and the results are included in the intermediate representation. so that This enables the best template to be chosen.
+To make these optimizations no change in the scenario analysis is required. Instead the scenarios of the UDF are tested for the properties and the results are included in the intermediate representation. This enables the best template to be chosen.
 
 \section{Single Recursion}
 
@@ -27,39 +27,47 @@ To make these optimizations no change in the scenario analysis is required. Inst
   \label{tr_callgraph}
 \end{wrapfigure}
 
-Single recursive functions are a subgroup of general recursive functions. They have a linear branching behaviour (\autoref{tr_callgraph}). The function as a whole may contain multiple callsites as long as each evaluation scenario contains only a single callsite. This is also the only criterion to detect single recursive functions.
+Single recursive functions are a subgroup of recursive functions. They posses a linear branching behaviour (\autoref{tr_callgraph}). The function as a whole may contain multiple callsites as long as each evaluation scenario contains only a single callsite. This is also the only criterion to detect single recursive functions.
 
-The function that computed the length of the \textit{collatz-series} (\autoref{lst:collatz_udf}) is an example for a single recursive function.
+The function that computed the length of a \textit{Collatz-series} \cite{collatz} (\autoref{lst:collatz_udf}) is an example for a single recursive function.
 
 \begin{figure}[h]
-    \centering\footnotesize
-    \begin{minipage}[b]{.45\linewidth}
     \centering
-    \sqlcode{snippets/collatz.sql}
+    \begin{minipage}[b]{\linewidth}
+    \centering
+    \begin{cminted}{postgresql}
+CREATE FUNCTION collatz(n numeric) RETURNS numeric AS $$
+  SELECT CASE
+    WHEN n = 1     THEN 1
+    WHEN n % 2 = 0 THEN 1 + collatz(n/2)
+    ELSE 1 + collatz(3*n+1)
+  END
+$$ LANGUAGE SQL;
+    \end{cminted}
     \subcaption{UDF computing the length of the \textit{collatz-series} for a start number $\texttt{n} > 0$.}
     \label{lst:collatz_udf}
     \end{minipage}
-    \begin{minipage}[b]{.5\linewidth}
-    \centering\ssmall
-        \begin{tabular}{|p{1em}|p{3.3cm}|p{2.9cm}|}\hline
+    \vspace*{8mm}
+    \begin{minipage}[b]{\linewidth}
+    \centering\footnotesize
+        \begin{tabular}{|p{1em}|p{5.5cm}|p{4.5cm}|}\hline
         \cellcolor{gray!25} & \texttt{\phantom{NOT }n=1} & \texttt{1}\\\hline
         \end{tabular}
         
-        \begin{tabular}{|p{1em}|p{3.3cm}|p{2.9cm}|}\hline
+        \begin{tabular}{|p{1em}|p{5.5cm}|p{4.5cm}|}\hline
         \cellcolor{gray!25} $\ast$ & \texttt{NOT n=1 AND \phantom{NOT }n \% 2 = 0} & \texttt{1 + collatz(n / 2)}\\\hline
         \end{tabular}
         
-        \begin{tabular}{|p{1em}|p{3.3cm}|p{2.9cm}|}\hline
+        \begin{tabular}{|p{1em}|p{5.5cm}|p{4.5cm}|}\hline
         \cellcolor{gray!25} $\ast$ & \texttt{NOT n=1 AND NOT n \% 2 = 0} & \texttt{1 + collatz(3 * n + 1)}\\\hline
         \end{tabular}
-        \vspace{2em}
     \subcaption{Scenarios of \texttt{collatz}. Each recursive scenario contains just a single callsite.}\label{collatz_scenarios}
     \end{minipage}
     \caption{}
     \label{collatz_sql_with_scenarios}
 \end{figure}
 
-The evaluation thus happens in a strict linear manner. As each scenario depends only on the result of the previous result the work-around (see \autoref{macro:evaluation_cte}) to access all previous computed results becomes unnecessary. In each iteration exactly one result is computed and in the next iteration the dependant scenario will be evaluated. There is no need to add all previous results to the current result in order to have those rows available later (\autoref{opt_sr_evaluation_cte}). Only actually new rows are added to the results.
+The evaluation thus happens in a strict linear manner. As each scenario depends only on the result of the previous result the work-around (see \autoref{macro:evaluation_cte}) to access all previous computed results becomes unnecessary. In each iteration exactly one result is computed and in the next iteration its only dependant scenario will be evaluated. There is no need to add all previous results to the current result in order to have those rows available later (\autoref{opt_sr_evaluation_cte}). Only new rows are added to the results as long as the function does terminate.
 
 \begin{figure}[h!]
     \centering
@@ -162,19 +170,33 @@ CTEs can be included in the query if they are only referenced from the callsite-
 
 \section{Constant argument removal}
 
-Some functions have arguments always just passed on to subsequent calls without modification, eg. configuration parameters. As these parameters do not change it is not necessary to include them in the callgraph-table or when matching rows by arguments. The argument can just be left as it is in the translation, eg. as \texttt{\$1}.
-
 \begin{figure}[h!]
     \sqlcode{snippets/sieve.sql}
-  \caption{Sieve of Eratosthenes. \texttt{sieve(2, ARRAY[1, 2, 3, ..., n])} computes all prime numbers up to \texttt{n}.}
+  \caption{Sieve of Eratosthenes. \texttt{sieve(2, ARRAY[1, 2, 3, ..., n])} computes all prime numbers up to \texttt{n}. The second argument contains a large array which is not modified during evaluation.}
   \label{lst:sieve_udf}
 \end{figure}
 
-Omitting unnecessary arguments saves memory as well as CPU-time. The two tables \texttt{callgraph} and \texttt{evaluation} are joined in each iteration of the \texttt{evaluation}-CTE by the function arguments. Removing unnecessary comparisons speeds up the query and saves memory as the same value is not copied again and again.
+Some functions have arguments always just passed on to subsequent calls without modification, eg. configuration parameters (\autoref{lst:sieve_udf}). As these parameters do not change it is not necessary to include them in the callgraph-table or when matching rows by arguments. The argument can just be left as it is in the translation, eg. as \texttt{\$1} (\autoref{car:arg_not_replaced}).
 
-No change to the template is necessary and detection of constant arguments is straight-forward: The nth argument of a UDF is constant if the nth argument in each callsite is just \texttt{\$n}. The argument is just removed from the list of arguments thus the argument is not considered when filling out templates.
+\begin{figure}[h!]
+    \centering
+    \begin{cminted}{postgresql}
+SELECT c.in_1                                     AS in_1, 
+       (SELECT array_agg(T.v)
+        FROM unnest($2) AS T(v)
+        WHERE (T.v = c.in_1 OR T.v % c.in_1 <> 0)
+          AND T.v = ANY((SELECT e.result)))       AS result
+FROM calls_to_basecases c
+WHERE (SELECT (2 * c.out_1) > (array_length($2, 1))
+    \end{cminted}
+    \caption{Evaluation of a nonrecursive scenario of \texttt{sieve} inside the \texttt{basecases}-CTE with constant argument removal. Note that \texttt{\$2} is not replaced by \texttt{c.in\_2}.}
+    \label{car:arg_not_replaced}
+\end{figure}
 
-\begin{figure}[h]
+Omitting unnecessary arguments saves memory as well as CPU-time. The two tables \texttt{callgraph} and \texttt{evaluation} (\autoref{car:tables}) are joined in each iteration of the \texttt{evaluation}-CTE by the function arguments. Removing unnecessary comparisons speeds up the query and saves memory as the same value is not copied again and again.
+
+
+\begin{figure}[h!]
     \centering\footnotesize
     \begin{minipage}[b]{\linewidth}
     \centering
@@ -199,23 +221,10 @@ No change to the template is necessary and detection of constant arguments is st
     \label{}
     \end{minipage}
     \caption{}
-    \label{}
+    \label{car:tables}
 \end{figure}
 
-\begin{figure}[h]
-    \centering
-    \begin{cminted}{postgresql}
-SELECT c.in_1                                  AS in_1, 
-       (SELECT array_agg(T.v)
-        FROM unnest($2) AS T(v)
-        WHERE (T.v = c.in_1 OR T.v % c.in_1 <> 0)
-          AND T.v = ANY((SELECT e.result)))       AS result
-FROM calls_to_basecases c
-WHERE (SELECT (2 * c.out_1) > (array_length($2, 1))
-    \end{cminted}
-    \caption{Evaluation of a nonrecursive scenario of \texttt{sieve} inside the \texttt{basecases}-CTE with constant argument removal. Note that \texttt{\$2} is not replaced by \texttt{c.in\_2}.}
-    \label{fig:my_label}
-\end{figure}
+No change to the template is necessary and detection of constant arguments is straight-forward: The nth argument of a UDF is constant if the nth argument in each callsite is just \texttt{\$n}. The argument is just removed from the list of arguments. Thus the argument is not considered when filling out templates.
 
 \section{Handling unhashable types}
 

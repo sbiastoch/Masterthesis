@@ -1,0 +1,7 @@
+\begin{minted}{postgresql}
+CREATE FUNCTION sum_sr(NUMERIC) RETURNS NUMERIC AS $$
+SELECT CASE WHEN $1 = 0 THEN 0
+            ELSE $1 + sum_sr($1 - 1)
+       END
+$$ LANGUAGE SQL;
+\end{minted}

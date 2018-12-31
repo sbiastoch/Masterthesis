@@ -1,6 +1,4 @@
-CREATE FUNCTION collatz(n numeric)
-RETURNS numeric AS
-$$
+CREATE FUNCTION collatz(n numeric) RETURNS numeric AS $$
   SELECT CASE
     WHEN n = 1     THEN 1
     WHEN n % 2 = 0 THEN 1 + collatz(n/2)

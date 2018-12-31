@@ -18,10 +18,10 @@ To track plans and times of parts of the translation the extension \texttt{auto\
 
 \section{Generic Template}
 
-The generic template is the default template without any UDF-specific optimizations as presented in \autoref{template}. The performance of the Fibonacci function (\autoref{intro_fib}) from the introduction is shown in \autoref{fig:fib_times}.
+The generic template is the default template without any UDF-specific optimizations as presented in \autoref{chapter:templates}. The performance of the Fibonacci function (\autoref{udf:fib}) is shown in \autoref{fig:fib_times}.
 
 \begin{figure}[h!]
-    \centering\small
+    \centering\footnotesize
     \includesvg{plots/fib}
     \caption{Run time of the Fibonacci function in its recursive version and the automatic translation. Additionally, a manually optimized version is compared.}
     \label{fig:fib_times}
@@ -34,13 +34,13 @@ The translated function is much faster nonetheless. Where the original takes min
 Nevertheless, the translation cannot keep up with the manually optimized function. The step from the translation to the manually optimized version is similar in magnitude to the step from the original to the translation: The runtime drops from minutes to milliseconds.\\
 Though the runtime grows as the inputs get even larger, but in a slower pace. The implementation provided runs nearly in linear time exploiting the need of only two values to be remembered to compute the next value.\\
 
-Eventually, other limitations stop computing even larger Fibonacci numbers in PostgreSQL: Somewhere between fib(600000) and fib(700000) the numeric datatype (which can represent numbers up to 131072 digits! \cite[p. 124 f.]{psql}) fails with an overflow. That being said, the manual optimized implementation is "as good as we can get" in SQL.
+Eventually, other limitations stop computing even larger Fibonacci numbers in PostgreSQL: Somewhere between fib(600000) and fib(700000) the numeric datatype (which can represent numbers up to 131072 digits! \cite[p. 124 f.]{psql}) fails with an overflow. That being said, the manual optimized implementation is close to "as good as we can get" in SQL.
 
 Each implementation has changed the complexity-class of the implementation. The recursive implementation of \texttt{fib} is exponential as previously computed values are repeatedly recomputed. Actually, the calltrees of the callsites are identical except for a single call.
 
-Problems with overlapping subproblems, as with Fibonacci, are subject to an optimization technique called "Dynamic Programming" and "Memoization". Starting from optimal subproblems solutions of larger problems are incremental computed. Dynamic Programming requires therefore to reformulate the algorithm to implement this approach. Memoization solves the problem top-down keeping the original recursive structure of the function. It is checked for each call whether this call was already evaluated. If so, the saved value is returned. Our translation uses the original recursive formulation and applies automatic memoization avoiding any redundant calls.
+Problems with overlapping subproblems, as with Fibonacci, are subject to an optimization technique called \textit{Dynamic Programming} and \textit{Memoization} (cf. \autoref{chapter:related_work}). Starting from optimal subproblems solutions of larger problems are incremental computed. Dynamic Programming requires therefore to reformulate the algorithm to implement this approach. Memoization solves the problem top-down keeping the original recursive structure of the function. It is checked for each call whether this call was already evaluated. If so, the saved value is returned. Our translation uses the original recursive formulation and applies automatic memoization avoiding any redundant calls.
 
-If an algorithm has no overlapping subproblems and there are no redundant calls memoization gives no speedup. Each calltree of the callsites is disjunct. The evaluation of these algorithms grounds on recursively dividing the problem in disjunct subproblems. The results then are recursively merged to construct the final result ("divide and conquer"). An example with two callsites is \texttt{quicksort} (\autoref{udf:quicksort}).
+If an algorithm has no overlapping subproblems and there are no redundant calls memoization gives no speedup. All subtrees are different. The evaluation of these algorithms grounds on recursively dividing the problem in disjunct subproblems. The results then are recursively merged to construct the final result ("divide and conquer"). An example with two callsites is \texttt{quicksort} (\autoref{udf:quicksort}).
 
 \begin{figure}[h!]
     \centering\small
@@ -78,7 +78,7 @@ Impact of number of scenarios (Overhead by predicates) \autoref{fig:recn_times}
 
 \section{Single and Tail Recursion}
 
-Functions with only one callsite per scenario are called \textit{single recursive functions}. In the context of this thesis I rank them among the group of divide and conquer algorithms as they have no overlapping subproblems. Consecutively, I use the \texttt{sum} (\autoref{udf:sum}) function as an example to study the performance of the translation.
+Functions with only one callsite per scenario are called \textit{single recursive functions}. In the context of this thesis I rank them among the group of divide and conquer algorithms as they have no overlapping subproblems. Consecutively, I use the \texttt{sum}\footnote{It is actually named \texttt{sum\_tr} to avoid conflicts with the equally named aggregate.} (\autoref{udf:sum_tr}) function as an example to study the performance of the translation.
 
 \begin{figure}[h!]
     \centering\small
@@ -101,7 +101,7 @@ Surprisingly, the generic translation of \texttt{sum} yields a runtime even wors
 
 This slowdown is apparently caused by the growth of the evaluation CTE. All previous results are accumulated there and each result adds all previous results to allow access to results from all earlier iterations. This behaviour makes the evaluation-CTE grow quadratically, even if the original function is linear.
 
-But this does not explain why the function performs worse than the quadratic non-memoizable quicksort. The problem is caused by the wrong guess of the query planner about the number of rows returned from the scan of \texttt{callgraph}. During scenario-evaluation the CTE \texttt{e} (proxying \texttt{evaluation}) is joined with \texttt{callgraph} two times: Once for joining callsites with their results using a hash join ($O(n+m)$, good). The other join is caused by the \texttt{NOT EXISTS} which is rewritten into a \texttt{LEFT JOIN}.
+But this does not explain why the function performs worse than the quadratic non-memoizable quicksort. The problem is caused by the wrong guess of the query planner about the number of rows returned from the scan of \texttt{callgraph}. During scenario-evaluation the CTE \texttt{e} (proxying \texttt{evaluation}) is joined with \texttt{callgraph} two times: Once for joining callsites with their results using a hash join ($O(n+m)$, good \cite[p. 463 ff.]{DMS}). The other join is caused by the \texttt{NOT EXISTS} which is rewritten into a \texttt{LEFT JOIN}.
 
 \begin{figure}[h!]
     \centering\scriptsize
@@ -121,9 +121,9 @@ But this does not explain why the function performs worse than the quadratic non
     \label{plan:sum}
 \end{figure}
 
-The planner assumes that only a single row is returned from \texttt{callgraph} after filtering with \texttt{c.callsite\_id IN (1)} and therefore chooses to make a \textit{nested loop anti join}. Nested loop joins are a good choice if one table is small because the runtime is $O(nm)$ \cite{???}. But the UDF has only a single callsite. Accordingly, the predicate is not selective at all and not one but all $n$ rows are returned. The working-table of evaluation has a size of $n/2$ on average. Thus the join complexity is in $O(n^2)$ -- for a single iteration. 
+The planner assumes that only a single row is returned from \texttt{callgraph} after filtering with \texttt{c.callsite\_id IN (1)} and therefore chooses to make a \textit{nested loop anti join}. Nested loop joins are a good choice if one table is small because the runtime is $O(nm)$ \cite[p. 454]{DMS}. But the UDF has only a single callsite. Accordingly, the predicate is not selective at all and not one but all $n$ rows are returned. The working-table of evaluation has a size of $n/2$ on average. Thus the join complexity is in $O(n^2)$ -- for a single iteration. 
 
-Evaluation of the callgraph happens in a level-wise fashion, one level per iteration. Recalling \autoref{???} the callgraph of a single recursive function is just a linked list so the depth of the callgraph is $n$. For quicksort the callgraph is a binary tree hence the depth is just $log_2(n)$. In sum, the generic translation of a single recursive functions increases complexity from $O(n)$ to $O(n^3)$.
+Evaluation of the callgraph happens in a level-wise fashion, one level per iteration. Recalling \autoref{tr_callgraph} the callgraph of a single recursive function is just a linked list so the depth of the callgraph is $n$. For quicksort the callgraph is a binary tree hence the depth is just $log_2(n)$. In sum, the generic translation of a single recursive functions increases complexity from $O(n)$ to $O(n^3)$.
 
 Using the template for single recursion fixes this issue. The template does not accumulate all previous results in the current result thus the working-table does not grow with $n$, but always yields only a single row. The size of \texttt{evaluation} remains linear.
 
@@ -135,9 +135,9 @@ The tail recursive optimization speeds up performance constantly by the factor o
 
 
 \begin{figure}[h!]
-    \centering\small
+    \centering\scriptsize
     \includesvg{plots/paramN_opts}
-    \caption{Impact of the different optimizations, compared to the original function \texttt{param4} (see \autoref{udfs:paramN})}
+    \caption{Impact of the different optimizations, compared to the original function \texttt{param4} (\autoref{udf:param4})}
     \label{fig:paramN}
 \end{figure}
 
@@ -145,7 +145,7 @@ The tail recursive optimization speeds up performance constantly by the factor o
 
 \autoref{fig:paramN} looks surprising. The original functions all perform similar and much better than the translations. Even more interesting: The UDF with just one argument performs worst. This behaviour is surprising since one would assume a simpler function to perform better in the translation because there is less data to manage and hence joining tables is easier.\\
 A first explanation could be the additional arguments giving the functions more selective join predicates. Yet, this cannot be the case as the additional arguments of the used functions are just the arguments passed to the function ergo the values are equal for all calls.\\
-A possible reason for the big difference lies in the join order of the evaluation-subqueries since the query plan reveals \autoref{???}. The function with one argument and n=200 at first makes a nested loop anti-join join \texttt{evaluation} (rows=500, actual=68) with \texttt{callgraph} (rows=1, actual=201). The result (rows=1, actual=100) is joined with a hash join with \texttt{evaluation} (rows=500, actual=101).\\
+A possible reason for the big difference lies in the join order of the evaluation-subqueries as the query plan reveals. The function with one argument and n=200 at first makes a nested loop anti-join join \texttt{evaluation} (rows=500, actual=68) with \texttt{callgraph} (rows=1, actual=201). The result (rows=1, actual=100) is joined by a hash join with \texttt{evaluation} (rows=500, actual=101).\\
 The UDF with four arguments has flipped the order of the joins: First, a hash join between \texttt{evaluation} (rows=940, actual=102) and \texttt{callgraph} (rows=100, actual=201) happens. The result (rows=1, actual=101) is joined with a nested loop anti-join with \texttt{evaluation} (rows=940, actual=69).
 
 Nested Loop Joins are a good choice when one table is small. Otherwise a hash join performs better. The other plan uses a hash join first and then the nested loop join. As a result, the nested loop join is executed on a smaller table which explains the better run-time. The plan from the UDF with one argument performs a nested loop join on tables with 68 and 201 rows while for the other plan the inputs are sized 69 and 101 rows.
@@ -155,13 +155,6 @@ Now to the observation that the original performs better than the translation. T
 
 % When limiting stack size to 100kb, param1_tr(320) is the first argument where it dies with "stack depth limit exceeded". As the function is nearly as simple as it gets, is seems to be valid to assume as lower bound that SQL will consume 1/3 kB per layer on the callstack. With default OS settings of max of 8MB on my machine, this means a maximum recursion depth of not more than roughly 25000 layers.  
 
-
-\begin{figure}
-    \centering
-    \include{tikz/fib_callstack_memoization.tex}
-    \caption{Callgraph with memoization, The callstack-tree becomes a Directed Acyclic Graph (DAG). Each node represents an invocation and each outgoing edge a new callsite. Because of memoization evaluation of equal invocations is performed only once, ie. they have the same descendants.}
-    \label{fig:fib_callstack_memoization}
-\end{figure}
 
 
 
