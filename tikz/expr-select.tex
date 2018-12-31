@@ -1,7 +1,7 @@
 {\footnotesize
 \begin{tikzpicture}[x=6mm, y=5mm]
 \node      at ( 8, 9) {$\SELECT$};
-\node (e1) at (10, 9) {$\highlight[red!15]{e_1}$};
+\node (e1) at (10, 9) {$\highlight[blue!15]{e_1}$};
 \node      at (11, 9) {$,$};
 \node (e2) at (12, 9) {$\highlight[green!15]{e_2}$};
 \node      at (13, 9) {$,$};
@@ -10,7 +10,7 @@
 
 \node (e11) at (6, 4) { 
     \begin{tabular}{|p{1em}|r|c|}\hline
-    \cellcolor{gray!25}  & \cellcolor{red!15} $\TRUE$ & \cellcolor{red!15}$e_1$\\\hline
+    \cellcolor{gray!25}  & \cellcolor{blue!15} $\TRUE$ & \cellcolor{blue!15}$e_1$\\\hline
     \end{tabular}
 };
 
@@ -33,12 +33,12 @@
 
 \node (r1) at (12, 0) {
     \begin{tabular}{|p{1em}|r|c|}\hline
-    \cellcolor{gray!25}  & $\SELECT ~ \highlight[red!15]{\TRUE} ~\AND~ \highlight[green!15]{p_{2,1}} ~\AND~ \highlight[yellow!15]{\TRUE}$ & $\SELECT~ \highlight[red!15]{e_1}, \highlight[green!15]{r_{2,1}}, \highlight[yellow!15]{e_3} ~ \FROM \dots$\\\hline
+    \cellcolor{gray!25}  & $\SELECT ~ \highlight[blue!15]{\TRUE} ~\AND~ \highlight[green!15]{p_{2,1}} ~\AND~ \highlight[yellow!15]{\TRUE}$ & $\SELECT~ \highlight[blue!15]{e_1}, \highlight[green!15]{r_{2,1}}, \highlight[yellow!15]{e_3} ~ \FROM \dots$\\\hline
     \end{tabular}
 };
 \node (r2) at (12, -1.25) {
     \begin{tabular}{|p{1em}|r|c|}\hline
-    \cellcolor{gray!25} $\ast$ & $\SELECT ~ \highlight[red!15]{\TRUE} ~\AND~ \highlight[green!15]{p_{2,2}} ~\AND~ \highlight[yellow!15]{\TRUE}$ & $\SELECT~ \highlight[red!15]{e_1}, \highlight[green!15]{r_{2,2}}, \highlight[yellow!15]{e_3} ~ \FROM \dots$\\\hline
+    \cellcolor{gray!25} $\ast$ & $\SELECT ~ \highlight[blue!15]{\TRUE} ~\AND~ \highlight[green!15]{p_{2,2}} ~\AND~ \highlight[yellow!15]{\TRUE}$ & $\SELECT~ \highlight[blue!15]{e_1}, \highlight[green!15]{r_{2,2}}, \highlight[yellow!15]{e_3} ~ \FROM \dots$\\\hline
     \end{tabular}
 };
 \draw[->, double, out=270, in=90, looseness = 0.5] (e1.south) to (e11);

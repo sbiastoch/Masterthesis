@@ -22,9 +22,9 @@ Generated queries usually contain a lot of trivial \texttt{SELECT}s and predicat
 
 \subsection{Structural Operational Semantics}
 
-A Structural Operational Semantic is an abstract way to define program evaluation step by step. Formally stated, it defines relations between states of an abstract machine. A state $S = (E, c)$ consists of an environment $E$ and some "code" $c$. Relations define transitions between two states. The notation $S \rightarrow S'$ (read: "$S$ evaluates \textit{in one step} to $S'$") is just a shorthand for $(S, S') \in \rightarrow$ where $\rightarrow$ is the relation. In my rules the environment does not change during a rule application so notations can be shortened and written as $E \vdash c \rightarrow c'$. \cite[Chapter 2]{semanticsWithApplications}
+A Structural Operational Semantic is an abstract way to define program evaluation step by step. Formally stated, it defines a relation between states of an abstract machine. The relation $\rightarrow$ defines transitions between two states. Writing $S \rightarrow S'$ (read: "$S$ evaluates to $S'$") is just a shorthand for $(S, S') \in \rightarrow$. A relations can be defined with respect to a given environment $E$, so: $E \vdash c \rightarrow c'$. \cite[Ch. 2]{semanticsWithApplications}
 
-A rule may have a number of \textit{premises} $p_1, p_2, \dots, p_n$ that must hold for the rule to be applicable. These premises are written on top of a line above the rule and may include \textit{judgments} over transitions $T \rightarrow^* T'$ which depict that two states are element of the reflexive transitive closure of the relation, ie. that $T$ can be evaluated to $T'$.
+A rule may have a number of \textit{premises} $p_1, p_2, \dots, p_n$ that must hold for the rule to be applicable. These premises are written on top of a line above the transistion and may include further rule applications. This way a complete derivation-tree, or a "proof-tree" can be created if the transistion at the root (the bottom) is element of the relation. This proof is at the same time the evaluation we want to perform.
 
 $$\inferrule{
    p_1\\
@@ -34,8 +34,6 @@ $$\inferrule{
 }{
     S \rightarrow S'
 }\quad\footnotesize{\textsc{(name)}}$$
-
-Evaluation happens by recursively applying transition rules from a starting state. Premises including judgments cause a callstack to build up until an axiom eventually returns a result (right part of the arrow). In the context of analyzing queries, many premises analyze a part of the query and wrap the result into its own structure.
 
 The provided rules give deterministic evaluation steps, ie. at most one rule is applicable at a time. This makes the rules a bit verbose, but simplifies implementation as no backtracking needs to be implemented to find the applicable rule.
 
@@ -123,7 +121,7 @@ For this section we focus on the rules involved in every translation. First, tho
 
 \subsection{Callsites and basecases}
 
-The leafs of every derivation tree are axioms. The two most important axioms are \RREC and \RBASE (see \autoref{rule:base_and_rec}). They assign a query-fragment either to the set of recursive ($R$) or non-recursive scenarios ($B$). The distinction is made by the presence of a \textit{callsite} in the given query-fragment. The predicate $\hasCallsite(T, e)$\footnote{Please ignore the argument $T$ of $\hasCallsite$ and the environment $T, C$ of the rules for now, we will come back to this later.} returns true if an actual recursive call to $fn$ is located in the subtree of the AST-representation of the query-fragment $e$.
+The leafs of every derivation tree are axioms. The two most important axioms are \RREC~ and \RBASE~ (see \autoref{rule:base_and_rec}). They assign a query-fragment either to the set of recursive ($R$) or non-recursive scenarios ($B$). The distinction is made by the presence of a \textit{callsite} in the given query-fragment. The predicate $\hasCallsite(T, e)$\footnote{Please ignore the argument $T$ of $\hasCallsite$ and the environment $T, C$ of the rules for now, we will come back to this later.} returns true if an actual recursive call to $fn$ is located in the subtree of the AST-representation of the query-fragment $e$.
 
 %The inference rules are applied recursively to an initial query, processing each layer one by one. In the end, each derivation treeare two axioms\footnote{By definition, an axiom has no premises. Premises without further rule application are actually side-constraints that limit rule applicability. Therefore this rules are considered anyway "axioms".}. Either we arrive at a \textit{callsite}, ie. the invocation of the recursive function itself, or the current subtree contains no callsite at all. In the latter case, it is not necessary to descend any further, we can consider the remaining subtree as basecase.
 
@@ -216,7 +214,7 @@ The segmented rectangles on the right (\autoref{scenarios:simple_case}) depict t
     \end{tikzpicture}
     \subcaption{Generated scenarios for each branch of the \CASE-expression.}\label{scenarios:simple_case}
     \end{minipage}
-    \caption{}\label{rule:base_and_rec}
+    \caption{}
 \end{figure}
 
 %\setlength{\tabcolsep}{2pt}
@@ -724,6 +722,19 @@ We can counter these issues by removing the CTEs from the original query before 
 
 \subsection{Tracking recursive CTEs}\label{tracking_recursive_ctes}
 
+\begin{wrapfigure}{r}{0.4\textwidth}
+    \begin{minted}{postgresql}
+    WITH T AS (SELECT fn(n-1))
+    SELECT *
+    FROM (
+      WITH T AS (SELECT 1)
+      SELECT * FROM T
+    ) T
+    \end{minted}
+    \caption{The outer recursive CTE \texttt{T} is shadowed by an inner CTE.}
+    \label{lst:indirect_callsite_ref}
+\end{wrapfigure}
+
 % Recursive CTEs are gathered step by step 
 CTEs may contain callsites and therefore need to be analyzed as well. They are processed step by step before the actual query. This enables a CTE to reference preceding CTEs. If a CTE-scenario contains a callsite its alias is added to the list of recursive CTEs $T$ in scope. Otherwise, the alias is removed from that list because of the new CTE shadows any outer recursive CTE with the same name (\texttt{WITH}-queries can be nested). (\autoref{lst:indirect_callsite_ref}).
 
@@ -761,19 +772,6 @@ Whenever a query-fragment which references a CTE from $T$ is encountered we know
 
 % Referenced CTEs are detected via unbound variables
 References to CTEs can easily be collected from a query-fragment by searching for free table-variables. The function to compute all free table-variables of a query-fragment $e$ is called $\FV(e)$. Its implementation is straight forward: Each CTE definition within a \WITH-block adds its alias to the list of bound table-variables. Every reference to a table-variable not contained in that list is considered free.
-
-\begin{wrapfigure}{r}{0.4\textwidth}
-    \begin{minted}{postgresql}
-    WITH T AS (SELECT fn(n-1))
-    SELECT *
-    FROM (
-      WITH T AS (SELECT 1)
-      SELECT * FROM T
-    ) T
-    \end{minted}
-    \caption{The outer recursive CTE \texttt{T} is shadowed by an inner CTE.}
-    \label{lst:indirect_callsite_ref}
-\end{wrapfigure}
 
 % Row-references vs. table-variables
 Note that two different types of free variables inside a query-fragment can occur: \textit{Table-Variables} and \textit{Row-References}. Table-variables like \texttt{T} can exclusively be used in ~\FROM~ and reference an entire table. This table-variables are declared either by the existence of a table in the current database or by a CTE. Row-references like \texttt{T.v} point to a single table-row of a table referenced by ~\FROM. A bare row-reference cannot cause a query to be recursive. It is always the from-clause that declares this row-references and binds it to a table. This table is always evaluated first, no matter whether any row-reference is used at all. For this reason it is sufficient to track only \textit{table}-variables and ignore row-references entirely.
@@ -930,7 +928,7 @@ The function $\deps$ collects free table-variables (ie. used CTEs) of $q$ togeth
 
 \subsection{{\normalfont\RCTE}-rule: Collecting and analyzing CTE-Scenarios}
 
-The idea from the \REXPR-rule of building the cross product between all scenarios of its subtrees is also present in the \RCTE-rule. Yet our extended notion of a function is not suitable for an entire \texttt{WITH}-clause. There is no \texttt{WITH}-"function" node at the root with $n$ independent children, one for each CTE: $\texttt{WITH}(t_1, t_2, t_3, q)$. It is more a right-deep tree of individual CTE-definitions where each CTE depends on the preceding CTEs: $\texttt{CTE}(t_1, \texttt{CTE}(t_2, \texttt{CTE}(t_3, q)))$. Therefore each \texttt{CTE} must be analyzed individually and the environment is modified accordingly for every CTE-scenario. With the changed environment following CTEs are analyzed and eventually the actual query $q$.
+The idea from the \REXPR-rule of building the cross product between all scenarios of its subtrees is also present in the \RCTE-rule (\autoref{rule:cte}). Yet our extended notion of a function is not suitable for an entire \texttt{WITH}-clause. There is no \texttt{WITH}-"function" node at the root with $n$ independent children, one for each CTE: $\texttt{WITH}(t_1, t_2, t_3, q)$. It is more a right-deep tree of individual CTE-definitions where each CTE depends on the preceding CTEs: $\texttt{CTE}(t_1, \texttt{CTE}(t_2, \texttt{CTE}(t_3, q)))$. Therefore each \texttt{CTE} must be analyzed individually and the environment is modified accordingly for every CTE-scenario. With the changed environment following CTEs are analyzed and eventually the actual query $q$.
 
 The environment is changed in two ways: First, the list of recursive table-variables $T$ is updated. If the evaluation-scenario of the CTE is recursive the alias of the CTE is added to $T$. If the CTE-scenario is nonrecursive the alias is removed from $T$ since any recursive reference is now shadowed by this nonrecursive CTE. Second, the CTE-scenario is added alongside its dependencies to the CTE-store $C$.
 

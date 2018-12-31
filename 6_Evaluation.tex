@@ -43,7 +43,7 @@ Problems with overlapping subproblems, as with Fibonacci, are subject to an opti
 If an algorithm has no overlapping subproblems and there are no redundant calls memoization gives no speedup. All subtrees are different. The evaluation of these algorithms grounds on recursively dividing the problem in disjunct subproblems. The results then are recursively merged to construct the final result ("divide and conquer"). An example with two callsites is \texttt{quicksort} (\autoref{udf:quicksort}).
 
 \begin{figure}[h!]
-    \centering\small
+    \centering\footnotesize
     \includesvg{plots/nonoverlapping}
     \caption{Runtimes for quicksort as a quadratic divide and conquer algorithm.}
     \label{fig:nonoverlapping_times}
@@ -54,7 +54,7 @@ If an algorithm has no overlapping subproblems and there are no redundant calls 
 As a last aspect of the generic translation I examine the fraction of time spent in each part of the translation \autoref{fig:split_times}. We see that the evaluation is by far the costliest part of the translation. Noteworthy is the large fraction the bare result selection takes. This can be explained by the following: Each iteration of the evaluation works on a linear growing working-table which is together with the new results appended to the final result. The final result of the CTE includes lots of duplicates which are only seen when selecting the result. Therefore both parts constantly have a significant influence on the total runtime, opposed to callgraph and basecase which marginalize over time.
 
 \begin{figure}[h!]
-    \centering\small
+    \centering\footnotesize
     \includesvg{plots/split}
     \caption{Percentage of runtime for each part of the translation of \texttt{fib}}
     \label{fig:split_times}
@@ -63,7 +63,7 @@ As a last aspect of the generic translation I examine the fraction of time spent
 
 \iffalse
 \begin{figure}[h]
-    \centering\small
+    \centering\footnotesize
     \includesvg{plots/recN}
     \caption{Impact of the number of scenarios on the runtime. Single recursive function with expensive predicates}
     \label{fig:recn_times}
@@ -81,19 +81,22 @@ Impact of number of scenarios (Overhead by predicates) \autoref{fig:recn_times}
 Functions with only one callsite per scenario are called \textit{single recursive functions}. In the context of this thesis I rank them among the group of divide and conquer algorithms as they have no overlapping subproblems. Consecutively, I use the \texttt{sum}\footnote{It is actually named \texttt{sum\_tr} to avoid conflicts with the equally named aggregate.} (\autoref{udf:sum_tr}) function as an example to study the performance of the translation.
 
 \begin{figure}[h!]
-    \centering\small
+    \centering\footnotesize
     \includesvg{plots/sum}
     \caption{Sum as example for a single recursive function. Calls to the original \texttt{sum} eventually exceed stack depth.}
     \label{fig:factorial_times}
 \end{figure}
 
+The original function starts out linear but slows down a bit for large inputs before exceeding the maximum stack size. The speedup by the optimized translation is roughly by factor 10 with no limitation by the maximum stack size.
 
-Surprisingly, the generic translation of \texttt{sum} yields a runtime even worse than the original quicksort function. Quicksort was run with an array of descending numbers thus the runtime equals the worst case of $O(n^2)$. The original single recursive version of \texttt{sum} grows roughly linear as we can see from the plot. The generic translation of \texttt{sum} degrades the performance of the linear function heavily. It is even worse than quicksort (\autoref{fig:nonoverlapping_times}) -- which is quadratic.
+The tail recursive optimization compared to the single recursive optimization speeds up performance constantly by the factor of approx. 2. This seems natural considering that \autoref{fig:split_sr_times} shows the evaluation-CTE, which is omitted in the tail recursive template, accounting for approx. 40\% of the runtime.
+
+Surprisingly, the generic translation of \texttt{sum} yields a runtime even worse than the original quicksort function (cf. \autoref{fig:nonoverlapping_times}). Quicksort was run with an array of descending numbers thus the runtime equals the worst case of $O(n^2)$. The original single recursive version of \texttt{sum} grows roughly linear as we can see from the plot. The generic translation of \texttt{sum} degrades the performance of the linear function heavily. It is even worse than quicksort (\autoref{fig:nonoverlapping_times}) -- which is quadratic.
 
 \autoref{fig:split_sr_times} depicts the fraction of time each part of the translation consumes from the total computation time for a given input. On the left, the data is taken from the badly performing generic translation. On the right, the translation using the single recursive optimization is shown. Noticeably, the generic translation evaluation marginalizes all other parts of the translation.
 
 \begin{figure}[h!]
-    \centering\small
+    \centering\footnotesize
     \includesvg{plots/split_sr}
     \caption{Fraction of total runtime spend in each part of the translation of \texttt{sum}.}
     \label{fig:split_sr_times}
@@ -101,7 +104,7 @@ Surprisingly, the generic translation of \texttt{sum} yields a runtime even wors
 
 This slowdown is apparently caused by the growth of the evaluation CTE. All previous results are accumulated there and each result adds all previous results to allow access to results from all earlier iterations. This behaviour makes the evaluation-CTE grow quadratically, even if the original function is linear.
 
-But this does not explain why the function performs worse than the quadratic non-memoizable quicksort. The problem is caused by the wrong guess of the query planner about the number of rows returned from the scan of \texttt{callgraph}. During scenario-evaluation the CTE \texttt{e} (proxying \texttt{evaluation}) is joined with \texttt{callgraph} two times: Once for joining callsites with their results using a hash join ($O(n+m)$, good \cite[p. 463 ff.]{DMS}). The other join is caused by the \texttt{NOT EXISTS} which is rewritten into a \texttt{LEFT JOIN}.
+But this does not explain why the function performs worse than the quadratic non-memoizable quicksort. The problem is caused by the wrong guess of the query planner about the number of rows returned from the scan of \texttt{callgraph}. During scenario-evaluation the CTE \texttt{e} (proxying \texttt{evaluation}) is joined with \texttt{callgraph} two times: Once for joining callsites with their results using a hash join ($O(n+m)$, good \cite[p. 463 ff.]{DMS}). The other join is caused by the \texttt{NOT EXISTS} which has been rewritten into a join by the optimizer.
 
 \begin{figure}[h!]
     \centering\scriptsize
@@ -123,35 +126,9 @@ But this does not explain why the function performs worse than the quadratic non
 
 The planner assumes that only a single row is returned from \texttt{callgraph} after filtering with \texttt{c.callsite\_id IN (1)} and therefore chooses to make a \textit{nested loop anti join}. Nested loop joins are a good choice if one table is small because the runtime is $O(nm)$ \cite[p. 454]{DMS}. But the UDF has only a single callsite. Accordingly, the predicate is not selective at all and not one but all $n$ rows are returned. The working-table of evaluation has a size of $n/2$ on average. Thus the join complexity is in $O(n^2)$ -- for a single iteration. 
 
-Evaluation of the callgraph happens in a level-wise fashion, one level per iteration. Recalling \autoref{tr_callgraph} the callgraph of a single recursive function is just a linked list so the depth of the callgraph is $n$. For quicksort the callgraph is a binary tree hence the depth is just $log_2(n)$. In sum, the generic translation of a single recursive functions increases complexity from $O(n)$ to $O(n^3)$.
+Evaluation of the callgraph happens in a level-wise fashion, one level per iteration. For quicksort the callgraph is a binary tree hence the depth is just $log_2(n)$. Recalling \autoref{tr_callgraph} the callgraph of a single recursive function is just a linked list so the depth of the callgraph is $n$. Therefore evaluation of the callgraph takes $n$ iterations. In sum, the generic translation increases complexity from $O(n)$ to $O(n^3)$ for the edge case of a single recursive functions.
 
 Using the template for single recursion fixes this issue. The template does not accumulate all previous results in the current result thus the working-table does not grow with $n$, but always yields only a single row. The size of \texttt{evaluation} remains linear.
-
-The original function starts out linear but slows down a bit for large inputs before exceeding stack size. The speedup by the optimized translation is roughly by factor 10 with no limitation by the maximum stack size.
-
-The tail recursive optimization speeds up performance constantly by the factor of approx. 2. This seems natural considering that \autoref{fig:split_sr_times} shows the evaluation-CTE, which is omitted in the tail recursive template, accounting for approx. 40\% of the runtime.
-
-\section{Template Optimizations}
-
-
-\begin{figure}[h!]
-    \centering\scriptsize
-    \includesvg{plots/paramN_opts}
-    \caption{Impact of the different optimizations, compared to the original function \texttt{param4} (\autoref{udf:param4})}
-    \label{fig:paramN}
-\end{figure}
-
-
-
-\autoref{fig:paramN} looks surprising. The original functions all perform similar and much better than the translations. Even more interesting: The UDF with just one argument performs worst. This behaviour is surprising since one would assume a simpler function to perform better in the translation because there is less data to manage and hence joining tables is easier.\\
-A first explanation could be the additional arguments giving the functions more selective join predicates. Yet, this cannot be the case as the additional arguments of the used functions are just the arguments passed to the function ergo the values are equal for all calls.\\
-A possible reason for the big difference lies in the join order of the evaluation-subqueries as the query plan reveals. The function with one argument and n=200 at first makes a nested loop anti-join join \texttt{evaluation} (rows=500, actual=68) with \texttt{callgraph} (rows=1, actual=201). The result (rows=1, actual=100) is joined by a hash join with \texttt{evaluation} (rows=500, actual=101).\\
-The UDF with four arguments has flipped the order of the joins: First, a hash join between \texttt{evaluation} (rows=940, actual=102) and \texttt{callgraph} (rows=100, actual=201) happens. The result (rows=1, actual=101) is joined with a nested loop anti-join with \texttt{evaluation} (rows=940, actual=69).
-
-Nested Loop Joins are a good choice when one table is small. Otherwise a hash join performs better. The other plan uses a hash join first and then the nested loop join. As a result, the nested loop join is executed on a smaller table which explains the better run-time. The plan from the UDF with one argument performs a nested loop join on tables with 68 and 201 rows while for the other plan the inputs are sized 69 and 101 rows.
-
-Now to the observation that the original performs better than the translation. This can be explained by the property of the given function being linear recursive. No branching occurs and no memoization can be exploited. The overhead of the translation is significant is such a case: The evaluation-CTE adds all the previous results to the new result for each step. The number of rows is therefore $(0 + 1) + (1 + 1) + (2 + 1) + \dots + (n + 1) = \frac{n(n+1)}{2}$ thus in $O(n^2)$. With the translation we have made a linear function quadratic. Note that the results were obtained with optimizations disabled. Hence there is hope as we see in the next section comparing optimizations to their originals.
-
 
 % When limiting stack size to 100kb, param1_tr(320) is the first argument where it dies with "stack depth limit exceeded". As the function is nearly as simple as it gets, is seems to be valid to assume as lower bound that SQL will consume 1/3 kB per layer on the callstack. With default OS settings of max of 8MB on my machine, this means a maximum recursion depth of not more than roughly 25000 layers.  
 
@@ -207,7 +184,7 @@ Yet another possibility is to analyze the maximum dependency distance to include
 
 Furthermore, we could analyze the callgraph and annotate points of interest. It may be beneficial to prune the evaluation table periodically or at advantageous points, eg. when a large subtree is completely evaluated. Pruning could happen by restarting evaluation, keeping only required rows.
 
-Another option is to persist tables in an unlogged temporary table. This has the advantage of rows being easily to remove if not required anymore. This could happen as a periodical side-effect during translation. Further, tables could be indexed and different processes could parallelly work together. Especially divide and conquere algorithms could benefit as they only need few evaluation passes and produce a large number of disjunct calls.\\
+Another option is to persist tables in an unlogged temporary table. This has the advantage of rows being easily to remove if not required anymore. This could happen as a periodical side-effect during translation. Further, tables could be indexed and different processes could parallelly work together. Especially divide and conquer algorithms could benefit as they only need few evaluation passes and produce a large number of disjunct calls.\\
 Persisted tables could also be used to memoize calls not only from the current query, but also from earlier queries. This could be used to implement a caching mechanism.
 
 Analyzing the callgraph may reveal independent subtrees which could be evaluated in parallel. This could either happen by manually triggering parallel execution by starting own processes that access common tables or by utilizing PostgreSQLs own parallel-query capabilities. 

@@ -6,7 +6,7 @@ To make these optimizations no change in the scenario analysis is required. Inst
 
 \section{Single Recursion}
 
-\begin{wrapfigure}{r}{0.2\textwidth}
+\begin{wrapfigure}{r}{0.3\textwidth}
   \vspace{-10pt}
   \centering
 \begin{tikzpicture}\small
@@ -44,9 +44,9 @@ CREATE FUNCTION collatz(n numeric) RETURNS numeric AS $$
   END
 $$ LANGUAGE SQL;
     \end{cminted}
-    \subcaption{UDF computing the length of the \textit{collatz-series} for a start number $\texttt{n} > 0$.}
+    \subcaption{UDF computing the length of a \textit{Collatz-series} for a start number $\texttt{n} > 0$.}
     \label{lst:collatz_udf}
-    \end{minipage}
+    \end{minipage}\par
     \vspace*{8mm}
     \begin{minipage}[b]{\linewidth}
     \centering\footnotesize
@@ -67,11 +67,11 @@ $$ LANGUAGE SQL;
     \label{collatz_sql_with_scenarios}
 \end{figure}
 
-The evaluation thus happens in a strict linear manner. As each scenario depends only on the result of the previous result the work-around (see \autoref{macro:evaluation_cte}) to access all previous computed results becomes unnecessary. In each iteration exactly one result is computed and in the next iteration its only dependant scenario will be evaluated. There is no need to add all previous results to the current result in order to have those rows available later (\autoref{opt_sr_evaluation_cte}). Only new rows are added to the results as long as the function does terminate.
+The evaluation thus happens in a strict linear manner. As each scenario depends only on the result of the previous call the work-around (see \autoref{macro:evaluation_cte}) to access all previous computed results becomes unnecessary. In each iteration exactly one result is computed and in the next iteration its only dependant scenario will be evaluated. There is no need to add all previous results to the current result in order to have those rows available later (\autoref{opt_sr_evaluation_cte}). Only new rows are added to the results as long as the function does terminate.
 
 \begin{figure}[h!]
     \centering
-    \begin{minted}{postgresql}
+    \begin{cminted}{postgresql}
 WITH RECRUSIVE
     ...
     evaluation(in_1, res) AS (
@@ -85,12 +85,12 @@ WITH RECRUSIVE
         )
     )
 SELECT ...
-    \end{minted}
+    \end{cminted}
     \caption{Simplified evaluation-template for single recursive UDFs.}
     \label{opt_sr_evaluation_cte}
 \end{figure}
 
-Furthermore, the rather complicated relational division, transposing and filtering for evaluable scenarios (\autoref{macro:recursive_scenario_evaluation}) can be replaced by a much simpler query (\autoref{opt_sr_eval_scenario}). Because each scenario has only a single callsite no grouping/partitioning is required to collect results of dependant callsites and to check whether all dependencies are available. If a result of the callsite is present the scenario can be evaluated. What remains is basically a simple join (\autoref{opt_sr}).
+Furthermore, the rather complicated relational division, transposing and filtering for evaluable scenarios (\autoref{macro:recursive_scenario_evaluation}) can be replaced by a much simpler query (\autoref{opt_sr_eval_scenario}). Because each scenario has only a single callsite no grouping/partitioning is required to collect results of dependant callsites and to check whether all dependencies are available. If a result of the callsite is present the scenario can be evaluated. What remains is basically a simple join (\autoref{opt_sr_eval_scenario}).
 
 \begin{figure}[h!]
     \centering
@@ -107,10 +107,10 @@ Furthermore, the rather complicated relational division, transposing and filteri
   \vspace{-10pt}
     \sqlcode{snippets/collatz_tr.sql}
   \caption{Tail recursive formulation of \texttt{collatz}}
-  \label{lst:fib_tr}
+  \label{lst:collatz_tr_new}
 \end{wrapfigure}
 
-A special form of single recursive functions are tail recursive functions. They do not have any evaluation context around any callsite. Therefore, each recursive scenario just returns another recursive call. Eventually, the result of the basecase is just passed all the way up in the callgraph to the root without any modifications. Hence, this last phase can be skipped, meaning no \texttt{evaluation}-CTE is required.
+A special form of single recursive functions are tail recursive functions (\autoref{lst:collatz_tr_new}). They do not have any evaluation context around any callsite. Therefore, each recursive scenario just returns another recursive call. Eventually, the result of the basecase is just passed all the way up in the callgraph to the root without any modifications. Hence, this last phase can be skipped, meaning no \texttt{evaluation}-CTE is required.
 
 \begin{figure}[h!]
     \centering
@@ -171,6 +171,7 @@ CTEs can be included in the query if they are only referenced from the callsite-
 \section{Constant argument removal}
 
 \begin{figure}[h!]
+\centering
     \sqlcode{snippets/sieve.sql}
   \caption{Sieve of Eratosthenes. \texttt{sieve(2, ARRAY[1, 2, 3, ..., n])} computes all prime numbers up to \texttt{n}. The second argument contains a large array which is not modified during evaluation.}
   \label{lst:sieve_udf}
@@ -224,7 +225,7 @@ Omitting unnecessary arguments saves memory as well as CPU-time. The two tables 
     \label{car:tables}
 \end{figure}
 
-No change to the template is necessary and detection of constant arguments is straight-forward: The nth argument of a UDF is constant if the nth argument in each callsite is just \texttt{\$n}. The argument is just removed from the list of arguments. Thus the argument is not considered when filling out templates.
+No change to the template is necessary and detection of constant arguments is straight-forward: The nth argument of a UDF is constant if the nth argument in each callsite is just \texttt{\$1}. The argument is just removed from the list of arguments. Thus the argument is not considered when filling out templates.
 
 \section{Handling unhashable types}
 
@@ -238,7 +239,7 @@ If the return type is not hashable the result from each evaluated scenario must 
 
 Hashable arguments have to be casted to \texttt{TEXT} when creating the \texttt{callgraph}. To evaluate the callsite-arguments the reference to the \texttt{out}-columns must be casted back to the original type. The same is required when replacing arguments during scenario-evaluation.
 
-Unhashable types are detected by introspecting PostgreSQL (\autoref{sql:hashable_query}). This makes the translation aware of custom hash-operators. PostgreSQL has some type-aliases defined, eg. \texttt{smallint} is an alias for \texttt{int2}. The first is returned by \texttt{t.oid::regtype} and the latter by \texttt{t.typename}.
+Unhashable types are detected by introspecting PostgreSQL (\autoref{sql:hashable_query}). This makes the translation aware of user defined hash-operators. PostgreSQL has some type-aliases defined, eg. \texttt{smallint} is an alias for \texttt{int2}. The first is returned by \texttt{t.oid::regtype} and the latter by \texttt{t.typename}.
 
 \begin{figure}
     \centering
